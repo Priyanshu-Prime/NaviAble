@@ -1,0 +1,11 @@
+# Replace the path below with the ACTUAL path to your split dataset folder
+path: C:/Users/priya.ASUS-LAPTOP/Music/NaviAble_Project/NaviAble_Dataset
+
+train: images/train
+val: images/val
+
+# Number of classes
+nc: 4
+
+# Class names (The order MUST match your conversion script)
+names: ['step', 'stair', 'ramp', 'grab_bar']
