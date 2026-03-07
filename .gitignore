@@ -1,9 +1,32 @@
-dataset
-NaviAble_Dataset
-labels_out
+# ──── Virtual Environment ────
 venv/
-runs/
-*.pt
+
+# ──── Python Cache ────
 __pycache__/
 *.pyc
+*.pyo
+
+# ──── OS Files ────
 .DS_Store
+Thumbs.db
+
+# ──── YOLO Model Weights ────
+*.pt
+
+# ──── Datasets & Images ────
+dataset/
+NaviAble_Dataset/
+labels_out/
+stair-and-ramp-2/
+
+# ──── Generated NLP Data ────
+accessibility_reviews.csv
+
+# ──── YOLO Training Runs ────
+runs/
+NaviAble_Week5/
+
+# ──── RoBERTa Model Artifacts ────
+NaviAble_RoBERTa/
+NaviAble_RoBERTa_Final/
+NaviAble_RoBERTa_Checkpoints/

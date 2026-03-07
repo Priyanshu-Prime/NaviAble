@@ -1,3 +1,4 @@
+# ──── YOLO Object Detection ────
 ultralytics>=8.0.0
 opencv-python>=4.8.0
 PyYAML>=6.0
@@ -5,3 +6,12 @@ Pillow>=10.0.0
 numpy>=1.24.0
 torch>=2.0.0
 torchvision>=0.15.0
+
+# ──── NLP / RoBERTa Integrity Module ────
+transformers>=4.30.0
+datasets>=2.14.0
+evaluate>=0.4.0
+pandas>=2.0.0
+
+# ──── Roboflow Dataset Download ────
+roboflow>=1.1.0

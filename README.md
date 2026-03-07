@@ -1,10 +1,18 @@
-# NaviAble - Object Detection for Accessibility
+# NaviAble - Object Detection & Review Integrity for Accessibility
 
-NaviAble is an object detection system based on YOLOv8/YOLO11 that identifies accessibility-related obstacles and features, including:
+NaviAble is a dual-module accessibility system combining **YOLO object detection** with a **RoBERTa-based NLP integrity engine** to support safer navigation and trustworthy accessibility information.
+
+### Module 1: Object Detection (YOLO)
+Identifies accessibility-related obstacles and features in images/video:
 - **Steps** - Detect stairs and steps
 - **Stairs** - Multi-step stairways
 - **Ramps** - Alternative accessible pathways
 - **Grab Bars** - Handrails and support structures
+
+### Module 2: Review Integrity Engine (RoBERTa)
+A fine-tuned RoBERTa classifier that flags generic "accessibility-washed" reviews vs. spatially specific genuine reviews:
+- **LABEL_0** - Flagged as generic / accessibility washing
+- **LABEL_1** - Verified as genuine / spatially specific
 
 This project helps create safer navigation systems for people with mobility challenges.
 
@@ -16,8 +24,11 @@ This project helps create safer navigation systems for people with mobility chal
 3. [Project Structure](#project-structure)
 4. [Using Your Own Dataset](#using-your-own-dataset)
 5. [Running Inference](#running-inference)
-6. [Training the Model](#training-the-model)
-7. [Utilities](#utilities)
+6. [Training the YOLO Model](#training-the-yolo-model)
+7. [NLP Integrity Module](#nlp-integrity-module)
+8. [Roboflow Dataset Integration](#roboflow-dataset-integration)
+9. [Utilities](#utilities)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -82,6 +93,7 @@ pip install -r requirements.txt
 **Option B: Install individually**
 ```powershell
 pip install ultralytics opencv-python pyyaml pillow
+pip install transformers datasets evaluate pandas roboflow
 ```
 
 This installs:
@@ -90,6 +102,11 @@ This installs:
 - **pyyaml** - Dataset configuration files
 - **pillow** - Advanced image operations
 - **torch/torchvision** - Deep learning backends
+- **transformers** - Hugging Face library for RoBERTa
+- **datasets** - Hugging Face dataset utilities
+- **evaluate** - Model evaluation metrics
+- **pandas** - Data manipulation for NLP dataset
+- **roboflow** - Dataset download from Roboflow
 
 ### Step 5: Verify Installation
 
@@ -106,13 +123,23 @@ python -c "from ultralytics import YOLO; print('Installation successful!')"
 NaviAble_Project/
 ├── README.md                      # This file
 ├── .gitignore                     # Git configuration
-├── data.yaml                      # Dataset configuration
+├── requirements.txt               # All Python dependencies
+├── data.yaml                      # Dataset configuration (original)
 │
 ├── yolo11n.pt                     # Pre-trained YOLO11 nano model
 ├── yolov8n.pt                     # Pre-trained YOLOv8 nano model
 │
+│── ── YOLO Scripts ──
 ├── convert_annotations.py         # Convert XML annotations to YOLO format
 ├── split_data.py                  # Split dataset into train/val
+├── train_dataset_2.py             # Train YOLO on Roboflow dataset
+├── dataset_2.py                   # Download dataset from Roboflow
+│
+│── ── NLP Scripts ──
+├── generate_nlp_data.py           # Generate accessibility_reviews.csv
+├── train_roberta.py               # Fine-tune RoBERTa integrity classifier
+├── test_roberta.py                # Test the trained RoBERTa model
+├── accessibility_reviews.csv      # Generated NLP training data
 │
 ├── dataset/                       # Your raw annotated dataset
 │   ├── wm_annotations.xml         # Annotations in XML format
@@ -126,11 +153,28 @@ NaviAble_Project/
 │       ├── train/                 # Training labels (YOLO format)
 │       └── val/                   # Validation labels (YOLO format)
 │
+├── stair-and-ramp-2/              # Roboflow-downloaded dataset
+│   ├── data.yaml
+│   ├── train/
+│   ├── valid/
+│   └── test/
+│
 ├── labels_out/                    # Converted label files (temporary)
 │
-├── runs/                          # Training and inference results
+├── runs/                          # YOLO training and inference results
 │   └── detect/
-│       └── NaviAble_v11/          # Results from latest run
+│       ├── NaviAble_v11/          # YOLO11 training run
+│       ├── NaviAble_v83/          # YOLOv8 training run
+│       └── NaviAble_Week5/        # Week 5 comparative run
+│
+├── NaviAble_RoBERTa/              # RoBERTa intermediate checkpoints
+├── NaviAble_RoBERTa_Checkpoints/  # RoBERTa training checkpoints
+├── NaviAble_RoBERTa_Final/        # Final trained RoBERTa model
+│   ├── config.json
+│   ├── model.safetensors
+│   ├── tokenizer.json
+│   ├── tokenizer_config.json
+│   └── training_args.bin
 │
 └── venv/                          # Virtual environment (auto-created)
 ```
@@ -246,7 +290,7 @@ results = model.predict(source='path/to/video.mp4', conf=0.5)
 
 ---
 
-## Training the Model
+## Training the YOLO Model
 
 ### Train on Your Dataset
 
@@ -280,6 +324,71 @@ Training results are saved in `runs/detect/train/`:
 - `results.csv` - Metrics over epochs
 - `confusion_matrix.png` - Classification performance
 - `best.pt` - Best model weights
+
+---
+
+## NLP Integrity Module
+
+The NaviAble Integrity Engine uses a fine-tuned **RoBERTa** model to classify accessibility reviews as either genuinely detailed or generic "accessibility washing".
+
+### Step 1: Generate Training Data
+
+```powershell
+python generate_nlp_data.py
+```
+
+This creates `accessibility_reviews.csv` with labeled samples:
+- **Label 0** - Generic / accessibility-washed reviews (e.g., "Fully accessible, 5 stars!")
+- **Label 1** - Genuine / spatially specific reviews (e.g., "The ramp has a 1:12 slope with handrails at 34 inches")
+
+### Step 2: Train the RoBERTa Classifier
+
+```powershell
+python train_roberta.py
+```
+
+This fine-tunes `roberta-base` for 5 epochs and saves results to:
+- `NaviAble_RoBERTa_Checkpoints/` - Intermediate checkpoints
+- `NaviAble_RoBERTa_Final/` - Best performing model
+
+### Step 3: Test the Model
+
+```powershell
+python test_roberta.py
+```
+
+Runs the trained model against sample reviews and displays confidence scores:
+```
+NAVIABLE INTEGRITY ENGINE RESULTS
+========================================
+Review: "Everything is fully accessible, 5 stars!"
+Result: FLAGGED: GENERIC / WASHING (98.5% confidence)
+
+Review: "The entrance has a 1:12 slope ramp with handrails at 34 inches height."
+Result: VERIFIED GENUINE (97.2% confidence)
+```
+
+---
+
+## Roboflow Dataset Integration
+
+Use `dataset_2.py` to download an annotated stair-and-ramp dataset from Roboflow:
+
+```powershell
+python dataset_2.py
+```
+
+This downloads the dataset into `stair-and-ramp-2/` in YOLOv8 format with train/valid/test splits.
+
+### Train YOLO on the Roboflow Dataset
+
+```powershell
+python train_dataset_2.py
+```
+
+This trains YOLO11 on the downloaded Roboflow dataset for 25 epochs and saves results to `NaviAble_Week5/`.
+
+> **Note**: `dataset_2.py` contains a Roboflow API key. Do **not** commit this file with your real key — use environment variables or a `.env` file for production use.
 
 ---
 
@@ -334,12 +443,15 @@ Pre-trained models are downloaded on first use. Check your internet connection a
 - [ ] Python 3.8+ installed
 - [ ] Virtual environment created (`python -m venv venv`)
 - [ ] Virtual environment activated (`.\venv\Scripts\Activate.ps1`)
-- [ ] Dependencies installed (`pip install ultralytics opencv-python pyyaml pillow`)
+- [ ] Dependencies installed (`pip install -r requirements.txt`)
 - [ ] Prepare your dataset (images + annotations)
 - [ ] Run `convert_annotations.py` if needed
 - [ ] Run `split_data.py` to create train/val split
 - [ ] Update `data.yaml` with correct paths and classes
-- [ ] Run inference or training
+- [ ] Run YOLO inference or training
+- [ ] Run `generate_nlp_data.py` to create NLP training data
+- [ ] Run `train_roberta.py` to train the integrity classifier
+- [ ] Run `test_roberta.py` to verify the NLP model
 
 ---
 
@@ -347,7 +459,10 @@ Pre-trained models are downloaded on first use. Check your internet connection a
 
 - [Ultralytics YOLO Documentation](https://docs.ultralytics.com/)
 - [YOLO Format Explanation](https://roboflow.com/formats/yolo-darknet-txt)
-- [LabelImg for Annotation](https://github.com/heartexplorer/labelImg)
+- [LabelImg for Annotation](https://github.com/heartexplabs/labelImg)
+- [Hugging Face Transformers Documentation](https://huggingface.co/docs/transformers/)
+- [RoBERTa Paper](https://arxiv.org/abs/1907.11692)
+- [Roboflow Documentation](https://docs.roboflow.com/)
 
 ---
 
