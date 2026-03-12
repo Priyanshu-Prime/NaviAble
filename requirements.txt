@@ -12,6 +12,11 @@ transformers>=4.30.0
 datasets>=2.14.0
 evaluate>=0.4.0
 pandas>=2.0.0
+matplotlib>=3.7.0
+groq>=0.4.0
 
 # ──── Roboflow Dataset Download ────
 roboflow>=1.1.0
+
+# ──── Environment / Config ────
+python-dotenv>=1.0.0

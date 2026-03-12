@@ -22,97 +22,61 @@ This project helps create safer navigation systems for people with mobility chal
 1. [Prerequisites](#prerequisites)
 2. [Setup Instructions](#setup-instructions)
 3. [Project Structure](#project-structure)
-4. [Using Your Own Dataset](#using-your-own-dataset)
-5. [Running Inference](#running-inference)
-6. [Training the YOLO Model](#training-the-yolo-model)
-7. [NLP Integrity Module](#nlp-integrity-module)
-8. [Roboflow Dataset Integration](#roboflow-dataset-integration)
-9. [Utilities](#utilities)
-10. [Troubleshooting](#troubleshooting)
+4. [YOLO Object Detection](#yolo-object-detection)
+5. [NLP Integrity Module](#nlp-integrity-module)
+6. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Prerequisites
 
-Before you start, make sure you have:
-- **Python 3.8 or higher** (check with `python --version`)
-- **pip** (Python package manager, usually comes with Python)
-- **Git** (optional, for version control)
-
-### Check Your Python Installation
-```powershell
-python --version
-pip --version
-```
+- **Python 3.8+** (`python --version`)
+- **pip** (Python package manager)
+- **Git**
+- **CUDA-capable GPU** (optional, for faster training)
 
 ---
 
 ## Setup Instructions
 
-### Step 1: Clone or Download the Project
+### 1. Clone the Repository
 
-If you have this project as a ZIP file, extract it to your desired location. If using Git:
 ```powershell
 git clone <repository-url>
 cd NaviAble_Project
 ```
 
-### Step 2: Create a Virtual Environment
-
-A virtual environment keeps your project dependencies isolated. Navigate to the project folder in PowerShell and run:
+### 2. Create & Activate Virtual Environment
 
 ```powershell
 python -m venv venv
-```
-
-This creates a `venv/` folder containing all necessary Python files.
-
-### Step 3: Activate the Virtual Environment
-
-**On Windows PowerShell:**
-```powershell
 .\venv\Scripts\Activate.ps1
 ```
 
-You should see `(venv)` appear at the beginning of your command prompt.
+### 3. Install Dependencies
 
-> **Troubleshooting**: If you get an execution policy error, run:
-> ```powershell
-> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-> ```
-
-### Step 4: Install Dependencies
-
-With the virtual environment activated, install all required packages:
-
-**Option A: Using requirements.txt (Recommended)**
 ```powershell
 pip install -r requirements.txt
 ```
 
-**Option B: Install individually**
+### 4. Configure Environment Variables
+
 ```powershell
-pip install ultralytics opencv-python pyyaml pillow
-pip install transformers datasets evaluate pandas roboflow
+Copy-Item .env.example .env
 ```
 
-This installs:
-- **ultralytics** - YOLO detection framework
-- **opencv-python** - Image processing
-- **pyyaml** - Dataset configuration files
-- **pillow** - Advanced image operations
-- **torch/torchvision** - Deep learning backends
-- **transformers** - Hugging Face library for RoBERTa
-- **datasets** - Hugging Face dataset utilities
-- **evaluate** - Model evaluation metrics
-- **pandas** - Data manipulation for NLP dataset
-- **roboflow** - Dataset download from Roboflow
+Edit `.env` and add your API keys:
+```
+GROQ_API_KEY=your_groq_api_key_here
+ROBOFLOW_API_KEY=your_roboflow_api_key_here
+```
 
-### Step 5: Verify Installation
+> **Important**: `.env` is gitignored and will never be committed.
 
-Test if everything is installed correctly:
+### 5. Verify Installation
+
 ```powershell
-python -c "from ultralytics import YOLO; print('Installation successful!')"
+python -c "from config import *; print('Setup OK')"
 ```
 
 ---
@@ -122,357 +86,159 @@ python -c "from ultralytics import YOLO; print('Installation successful!')"
 ```
 NaviAble_Project/
 ├── README.md                      # This file
-├── .gitignore                     # Git configuration
-├── requirements.txt               # All Python dependencies
-├── data.yaml                      # Dataset configuration (original)
+├── .gitignore                     # Git ignore rules
+├── .env.example                   # Environment variables template
+├── requirements.txt               # Python dependencies
+├── config.py                      # Centralized configuration (loads .env)
+├── data.yaml                      # YOLO dataset configuration
 │
-├── yolo11n.pt                     # Pre-trained YOLO11 nano model
-├── yolov8n.pt                     # Pre-trained YOLOv8 nano model
+├── yolo/                          # YOLO Object Detection module
+│   ├── convert_annotations.py     # Convert XML annotations → YOLO format
+│   ├── split_data.py              # Split dataset into train/val (80/20)
+│   ├── download_roboflow.py       # Download dataset from Roboflow API
+│   └── train_yolo.py              # Train YOLOv11n on downloaded dataset
 │
-│── ── YOLO Scripts ──
-├── convert_annotations.py         # Convert XML annotations to YOLO format
-├── split_data.py                  # Split dataset into train/val
-├── train_dataset_2.py             # Train YOLO on Roboflow dataset
-├── dataset_2.py                   # Download dataset from Roboflow
+├── nlp/                           # NLP Review Integrity module
+│   ├── generate_synthetic_data.py # Generate synthetic training samples
+│   ├── generate_review_data.py    # Download & auto-label 10K Yelp reviews
+│   ├── get_targeted_reviews.py    # Filter reviews for accessibility keywords
+│   ├── balance_data.py            # Balance 650K reviews into 8K dataset
+│   ├── generate_llm_labels.py     # Label 1K reviews via Groq LLM API
+│   ├── mine_real_data.py          # Auto-mine genuine accessibility reviews
+│   ├── merge_data.py              # Merge & balance all mined datasets
+│   ├── train_roberta.py           # Fine-tune RoBERTa classifier (5 epochs)
+│   ├── test_roberta.py            # Interactive CLI for testing predictions
+│   ├── compare_models.py          # Compare RoBERTa vs regex baseline
+│   └── plot_metrics.py            # Generate training loss/accuracy graphs
 │
-│── ── NLP Scripts ──
-├── generate_nlp_data.py           # Generate accessibility_reviews.csv
-├── train_roberta.py               # Fine-tune RoBERTa integrity classifier
-├── test_roberta.py                # Test the trained RoBERTa model
-├── accessibility_reviews.csv      # Generated NLP training data
-│
-├── dataset/                       # Your raw annotated dataset
-│   ├── wm_annotations.xml         # Annotations in XML format
-│   └── images/                    # Raw image files
-│
-├── NaviAble_Dataset/              # Processed dataset (train/val split)
-│   ├── images/
-│   │   ├── train/                 # Training images
-│   │   └── val/                   # Validation images
-│   └── labels/
-│       ├── train/                 # Training labels (YOLO format)
-│       └── val/                   # Validation labels (YOLO format)
-│
-├── stair-and-ramp-2/              # Roboflow-downloaded dataset
-│   ├── data.yaml
-│   ├── train/
-│   ├── valid/
-│   └── test/
-│
-├── labels_out/                    # Converted label files (temporary)
-│
-├── runs/                          # YOLO training and inference results
-│   └── detect/
-│       ├── NaviAble_v11/          # YOLO11 training run
-│       ├── NaviAble_v83/          # YOLOv8 training run
-│       └── NaviAble_Week5/        # Week 5 comparative run
-│
-├── NaviAble_RoBERTa/              # RoBERTa intermediate checkpoints
-├── NaviAble_RoBERTa_Checkpoints/  # RoBERTa training checkpoints
-├── NaviAble_RoBERTa_Final/        # Final trained RoBERTa model
-│   ├── config.json
-│   ├── model.safetensors
-│   ├── tokenizer.json
-│   ├── tokenizer_config.json
-│   └── training_args.bin
-│
-└── venv/                          # Virtual environment (auto-created)
+├── dataset/                       # Raw images & XML annotations (gitignored)
+├── NaviAble_Dataset/              # Processed train/val split (gitignored)
+├── labels_out/                    # Converted YOLO labels (gitignored)
+├── stair-and-ramp-2/              # Roboflow dataset (gitignored)
+├── runs/                          # YOLO training outputs (gitignored)
+├── NaviAble_RoBERTa_Checkpoints/  # RoBERTa training checkpoints (gitignored)
+├── NaviAble_RoBERTa_Final/        # Final trained RoBERTa model (gitignored)
+└── venv/                          # Virtual environment (gitignored)
 ```
+
+All API keys are loaded from `.env` via the centralized `config.py` module — no secrets are stored in source code.
 
 ---
 
-## Using Your Own Dataset
+## YOLO Object Detection
 
-### Step 1: Prepare Your Images
+### Prepare Your Dataset
 
-1. Create a folder: `dataset/images/`
-2. Place all your images (.jpg, .png) in this folder
-
-### Step 2: Create Annotations
-
-You have two options:
-
-#### Option A: Using a Labeling Tool
-Use **Roboflow** or **LabelImg** to annotate your images:
-1. Download and install [LabelImg](https://github.com/heartexplorer/labelImg)
-2. Set the format to **YOLO**
-3. Annotate your images
-4. Export labels as `.txt` files
-
-#### Option B: Convert from XML
-If you have XML annotations (like `wm_annotations.xml`):
-
-1. Edit `convert_annotations.py` and update the classes list to match your objects:
-   ```python
-   classes = ["your_class_1", "your_class_2", "your_class_3"]
-   ```
-
-2. Run the conversion:
+1. Place images in `dataset/images/`
+2. Convert XML annotations to YOLO format:
    ```powershell
-   python convert_annotations.py
+   python yolo/convert_annotations.py
    ```
+3. Split into train/val sets:
+   ```powershell
+   python yolo/split_data.py
+   ```
+4. Update `data.yaml` with your class names if needed.
 
-### Step 3: Split Your Dataset
-
-Once you have images and labels, split them into training and validation sets:
+### Download Roboflow Dataset (Alternative)
 
 ```powershell
-python split_data.py
+python yolo/download_roboflow.py
 ```
 
-This script:
-- Matches images with their labels
-- Creates train/val folders
-- Defaults to 80% training / 20% validation
+### Train YOLO
 
-### Step 4: Update data.yaml
-
-Edit `data.yaml` with your dataset path and classes:
-
-```yaml
-path: C:/your/path/to/NaviAble_Dataset
-
-train: images/train
-val: images/val
-
-nc: 4                              # Number of classes
-names: ['class1', 'class2', 'class3', 'class4']  # Class names in order
+```powershell
+python yolo/train_yolo.py
 ```
 
----
-
-## Running Inference
-
-### Option 1: Run Detection on Images
+### Run Inference
 
 ```powershell
 python -c "
 from ultralytics import YOLO
-
-# Load model
 model = YOLO('yolo11n.pt')
-
-# Run inference
-results = model.predict(source='path/to/your/image.jpg', conf=0.5)
-
-# Save results
-results[0].save('detection_result.jpg')
-print('Detection complete!')
+results = model.predict(source='path/to/image.jpg', conf=0.5)
+results[0].save('result.jpg')
 "
 ```
-
-### Option 2: Run Detection on a Folder
-
-```powershell
-python -c "
-from ultralytics import YOLO
-
-model = YOLO('yolo11n.pt')
-results = model.predict(source='path/to/images/folder', conf=0.5)
-"
-```
-
-### Option 3: Run Detection on Video
-
-```powershell
-python -c "
-from ultralytics import YOLO
-
-model = YOLO('yolo11n.pt')
-results = model.predict(source='path/to/video.mp4', conf=0.5)
-"
-```
-
-### Confidence Threshold
-- `conf=0.5` - Detections with 50%+ confidence (adjust as needed)
-- Higher value = fewer but more confident detections
-- Lower value = more detections, including uncertain ones
-
----
-
-## Training the YOLO Model
-
-### Train on Your Dataset
-
-```powershell
-python -c "
-from ultralytics import YOLO
-
-# Load pre-trained model
-model = YOLO('yolo11n.pt')
-
-# Train
-results = model.train(
-    data='data.yaml',
-    epochs=100,
-    imgsz=640,
-    device=0,  # Use GPU (change to 'cpu' if no GPU available)
-    patience=20
-)
-"
-```
-
-### Training Parameters
-- **epochs** - Number of training cycles (default: 100)
-- **imgsz** - Image size in pixels (default: 640)
-- **device** - 0 for GPU, 'cpu' for CPU
-- **patience** - Stop early if no improvement after N epochs
-
-### Monitor Training
-
-Training results are saved in `runs/detect/train/`:
-- `results.csv` - Metrics over epochs
-- `confusion_matrix.png` - Classification performance
-- `best.pt` - Best model weights
 
 ---
 
 ## NLP Integrity Module
 
-The NaviAble Integrity Engine uses a fine-tuned **RoBERTa** model to classify accessibility reviews as either genuinely detailed or generic "accessibility washing".
+### Data Pipeline
 
-### Step 1: Generate Training Data
-
-```powershell
-python generate_nlp_data.py
-```
-
-This creates `accessibility_reviews.csv` with labeled samples:
-- **Label 0** - Generic / accessibility-washed reviews (e.g., "Fully accessible, 5 stars!")
-- **Label 1** - Genuine / spatially specific reviews (e.g., "The ramp has a 1:12 slope with handrails at 34 inches")
-
-### Step 2: Train the RoBERTa Classifier
+The NLP pipeline builds training data in stages. Run them in order:
 
 ```powershell
-python train_roberta.py
+# Step 1: Generate synthetic samples (quick baseline)
+python nlp/generate_synthetic_data.py
+
+# Step 2: Download & auto-label 10K Yelp reviews
+python nlp/generate_review_data.py
+
+# Step 3: Filter for accessibility-specific reviews
+python nlp/get_targeted_reviews.py
+
+# Step 4: Balance the full 650K dataset
+python nlp/balance_data.py
+
+# Step 5: Label reviews with Groq LLM (requires GROQ_API_KEY)
+python nlp/generate_llm_labels.py
+
+# Step 6: Mine more genuine reviews (requires GROQ_API_KEY)
+python nlp/mine_real_data.py
+
+# Step 7: Merge and balance all datasets
+python nlp/merge_data.py
 ```
 
-This fine-tunes `roberta-base` for 5 epochs and saves results to:
-- `NaviAble_RoBERTa_Checkpoints/` - Intermediate checkpoints
-- `NaviAble_RoBERTa_Final/` - Best performing model
-
-### Step 3: Test the Model
+### Train the Model
 
 ```powershell
-python test_roberta.py
+python nlp/train_roberta.py
 ```
 
-Runs the trained model against sample reviews and displays confidence scores:
-```
-NAVIABLE INTEGRITY ENGINE RESULTS
-========================================
-Review: "Everything is fully accessible, 5 stars!"
-Result: FLAGGED: GENERIC / WASHING (98.5% confidence)
+Fine-tunes `roberta-base` for 5 epochs. Model saved to `NaviAble_RoBERTa_Final/`.
 
-Review: "The entrance has a 1:12 slope ramp with handrails at 34 inches height."
-Result: VERIFIED GENUINE (97.2% confidence)
-```
-
----
-
-## Roboflow Dataset Integration
-
-Use `dataset_2.py` to download an annotated stair-and-ramp dataset from Roboflow:
+### Test the Model
 
 ```powershell
-python dataset_2.py
+python nlp/test_roberta.py
 ```
 
-This downloads the dataset into `stair-and-ramp-2/` in YOLOv8 format with train/valid/test splits.
+Interactive CLI — type any review text and get a prediction with confidence score.
 
-### Train YOLO on the Roboflow Dataset
+### Compare RoBERTa vs Regex
 
 ```powershell
-python train_dataset_2.py
+python nlp/compare_models.py
 ```
 
-This trains YOLO11 on the downloaded Roboflow dataset for 25 epochs and saves results to `NaviAble_Week5/`.
-
-> **Note**: `dataset_2.py` contains a Roboflow API key. Do **not** commit this file with your real key — use environment variables or a `.env` file for production use.
-
----
-
-## Utilities
-
-### Convert XML Annotations to YOLO Format
-
-Edit the classes in the script, then run:
-```powershell
-python convert_annotations.py
-```
-
-This creates `.txt` files in `labels_out/` with normalized bounding box coordinates.
-
-### Split Dataset into Train/Val
+### Plot Training Metrics
 
 ```powershell
-python split_data.py
+python nlp/plot_metrics.py
 ```
-
-By default uses 80/20 split. Edit the script to customize.
 
 ---
 
 ## Troubleshooting
 
-### Virtual Environment Won't Activate
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.\venv\Scripts\Activate.ps1
-```
-
-### Dependencies Installation Fails
-```powershell
-pip install --upgrade pip
-pip install ultralytics opencv-python pyyaml pillow
-```
-
-### CUDA/GPU not detected
-Install for CPU instead:
-```powershell
-python -c "from ultralytics import YOLO; model = YOLO('yolo11n.pt'); model.train(data='data.yaml', device='cpu')"
-```
-
-### Model file too large
-Pre-trained models are downloaded on first use. Check your internet connection and disk space.
+| Issue | Solution |
+|-------|----------|
+| Virtual env won't activate | `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` |
+| pip install fails | `pip install --upgrade pip` then retry |
+| CUDA not detected | Add `device='cpu'` to training calls |
+| Missing API key error | Ensure `.env` exists with valid keys (see Setup step 4) |
+| Model file not found | Run the training script first to generate the model |
 
 ---
 
-## Quick Start Checklist
+## Resources
 
-- [ ] Python 3.8+ installed
-- [ ] Virtual environment created (`python -m venv venv`)
-- [ ] Virtual environment activated (`.\venv\Scripts\Activate.ps1`)
-- [ ] Dependencies installed (`pip install -r requirements.txt`)
-- [ ] Prepare your dataset (images + annotations)
-- [ ] Run `convert_annotations.py` if needed
-- [ ] Run `split_data.py` to create train/val split
-- [ ] Update `data.yaml` with correct paths and classes
-- [ ] Run YOLO inference or training
-- [ ] Run `generate_nlp_data.py` to create NLP training data
-- [ ] Run `train_roberta.py` to train the integrity classifier
-- [ ] Run `test_roberta.py` to verify the NLP model
-
----
-
-## Additional Resources
-
-- [Ultralytics YOLO Documentation](https://docs.ultralytics.com/)
-- [YOLO Format Explanation](https://roboflow.com/formats/yolo-darknet-txt)
-- [LabelImg for Annotation](https://github.com/heartexplabs/labelImg)
-- [Hugging Face Transformers Documentation](https://huggingface.co/docs/transformers/)
+- [Ultralytics YOLO Docs](https://docs.ultralytics.com/)
+- [Hugging Face Transformers](https://huggingface.co/docs/transformers/)
 - [RoBERTa Paper](https://arxiv.org/abs/1907.11692)
-- [Roboflow Documentation](https://docs.roboflow.com/)
-
----
-
-## Support
-
-For issues or questions:
-1. Check the [Ultralytics GitHub Issues](https://github.com/ultralytics/ultralytics/issues)
-2. Review the troubleshooting section above
-3. Verify your dataset format matches YOLO requirements
-
----
-
-**Happy detecting! 🎯**
+- [Roboflow Docs](https://docs.roboflow.com/)

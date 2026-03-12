@@ -1,5 +1,5 @@
-# Replace the path below with the ACTUAL path to your split dataset folder
-path: C:/Users/priya.ASUS-LAPTOP/Music/NaviAble_Project/NaviAble_Dataset
+# Relative path to the split dataset folder (resolved from this file's location)
+path: ./NaviAble_Dataset
 
 train: images/train
 val: images/val

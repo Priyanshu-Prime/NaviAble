@@ -1,3 +1,6 @@
+# ──── Environment / Secrets ────
+.env
+
 # ──── Virtual Environment ────
 venv/
 
@@ -19,12 +22,27 @@ NaviAble_Dataset/
 labels_out/
 stair-and-ramp-2/
 
-# ──── Generated NLP Data ────
-accessibility_reviews.csv
-
-# ──── YOLO Training Runs ────
+# ──── YOLO Training Outputs ────
 runs/
 NaviAble_Week5/
+
+# ──── RoBERTa Model Outputs ────
+NaviAble_RoBERTa/
+NaviAble_RoBERTa_Checkpoints/
+NaviAble_RoBERTa_Final/
+
+# ──── Generated Data Files ────
+accessibility_reviews.csv
+production_roberta_dataset.csv
+production_roberta_balanced.csv
+targeted_accessibility_reviews.csv
+gold_standard_labels_groq.csv
+new_mined_data.csv
+NaviAble_Final_Training_Data.csv
+merge_data.csv
+
+# ──── Graph Outputs ────
+*.png
 
 # ──── RoBERTa Model Artifacts ────
 NaviAble_RoBERTa/
