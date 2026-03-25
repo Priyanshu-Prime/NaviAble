@@ -23,6 +23,20 @@ into the appropriate device.  In test environments the services are
 replaced by ``unittest.mock.MagicMock`` objects, keeping tests fast and
 dependency-free.
 
+Demo Mode
+---------
+Set the environment variable ``NAVIABLE_DEMO_MODE=true`` to make both
+services return realistic *synthetic* results when model weights are not
+present.  This allows the full API pipeline — including the React frontend
+— to be demonstrated without a GPU or trained weights.
+
+Demo mode behaviour:
+
+- ``YoloVisionService``: returns 1–3 sample accessibility feature detections
+  derived from the image byte-length so results vary between images.
+- ``RobertaNLPService``: performs lightweight keyword analysis on the review
+  text to produce plausible ``is_genuine`` and ``confidence`` values.
+
 Hardware note (GTX 1650 Ti, 4 GB VRAM)
 ---------------------------------------
 YOLOv11 is placed on CUDA when available.  RoBERTa runs on CPU by
@@ -47,6 +61,37 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 InferenceResult = dict[str, Any]
 
+# ---------------------------------------------------------------------------
+# Demo mode helpers
+# ---------------------------------------------------------------------------
+
+# Keywords indicating genuine physical accessibility descriptions.
+# Used only in demo/stub mode — the real RoBERTa model performs semantic
+# classification and does NOT rely on keyword matching.
+_GENUINE_KEYWORDS: frozenset[str] = frozenset({
+    "ramp", "handrail", "rail", "wheelchair", "elevator", "lift",
+    "tactile", "braille", "grab bar", "curb cut", "accessible entrance",
+    "flat entrance", "wide doorway", "doorway", "accessible parking",
+    "accessible bathroom", "accessible toilet", "disabled parking",
+    "slope", "incline", "gradient", "level access",
+})
+
+# Representative demo detections pool (mirrors the real YOLO class map)
+_DEMO_DETECTION_POOL: list[dict[str, Any]] = [
+    {"class": "ramp",              "confidence": 0.72, "bbox": [45,  120, 280, 380]},
+    {"class": "handrail",          "confidence": 0.61, "bbox": [10,  50,  60,  350]},
+    {"class": "flat_entrance",     "confidence": 0.55, "bbox": [100, 200, 400, 450]},
+    {"class": "accessible_doorway","confidence": 0.63, "bbox": [80,  30,  320, 420]},
+    {"class": "tactile_paving",    "confidence": 0.58, "bbox": [20,  400, 500, 480]},
+]
+
+
+def _is_demo_mode() -> bool:
+    """Return True when the NAVIABLE_DEMO_MODE environment variable is set."""
+    return os.environ.get("NAVIABLE_DEMO_MODE", "false").strip().lower() in (
+        "1", "true", "yes", "on"
+    )
+
 
 # ---------------------------------------------------------------------------
 # YOLOv11 Vision Service
@@ -60,6 +105,8 @@ class YoloVisionService:
     - Load the ``.pt`` weights file into GPU/CPU memory exactly once.
     - Accept raw image bytes and return a structured detection result.
     - Filter detections below the configured confidence threshold.
+    - In demo mode (``NAVIABLE_DEMO_MODE=true``), return synthetic results
+      that vary by image so the frontend can be demonstrated without weights.
 
     Attributes
     ----------
@@ -111,7 +158,7 @@ class YoloVisionService:
         try:
             from ultralytics import YOLO  # type: ignore[import-untyped]
 
-            logger.info("Loading YOLOv11 weights from %s …", self.model_path)
+            logger.info("Loading YOLOv11 weights from %s ...", self.model_path)
             self._model = YOLO(self.model_path)
             logger.info("YOLOv11 loaded successfully.")
         except (ImportError, ModuleNotFoundError):
@@ -146,15 +193,18 @@ class YoloVisionService:
         -------
         InferenceResult
             A dictionary with keys:
+
             - ``objects_detected`` (int): number of detections above threshold.
             - ``features`` (list[dict]): each dict contains ``class``,
               ``confidence``, and ``bbox`` (``[x1, y1, x2, y2]``).
         """
         if self._model is None:
+            if _is_demo_mode():
+                return self._demo_predict(image_bytes)
             logger.warning("YOLOv11 model not loaded; returning empty result.")
             return {"objects_detected": 0, "features": []}
 
-        # Convert raw bytes → numpy array via PIL to avoid disk I/O
+        # Convert raw bytes -> numpy array via PIL to avoid disk I/O
         from PIL import Image  # type: ignore[import-untyped]
 
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -177,6 +227,28 @@ class YoloVisionService:
 
         return {"objects_detected": len(features), "features": features}
 
+    def _demo_predict(self, image_bytes: bytes) -> InferenceResult:
+        """Return synthetic detections for demo/development mode.
+
+        Uses the image byte-length (mod 3) + 1 to select 1, 2, or 3
+        detections from the pool, giving variety across different images
+        without requiring real inference.
+
+        Parameters
+        ----------
+        image_bytes : bytes
+            The raw image — only its length is used as a variety seed.
+
+        Returns
+        -------
+        InferenceResult
+            Synthetic but realistic-looking detection results.
+        """
+        num_detections = (len(image_bytes) % 3) + 1
+        features = _DEMO_DETECTION_POOL[:num_detections]
+        logger.info("DEMO MODE: returning %d synthetic YOLO detections.", num_detections)
+        return {"objects_detected": len(features), "features": features}
+
 
 # ---------------------------------------------------------------------------
 # RoBERTa NLP Integrity Service
@@ -185,10 +257,8 @@ class YoloVisionService:
 class RobertaNLPService:
     """Singleton wrapper around the fine-tuned RoBERTa text classifier.
 
-    The model was trained using LLM Knowledge Distillation (Groq /
-    llama-3.1-8b-instant) on a balanced 402-row dataset specifically
-    designed to defeat the "Clever Hans" keyword-matching failure mode
-    observed in the Phase A baseline.
+    The model was trained using LLM Knowledge Distillation on a balanced
+    402-row dataset designed to defeat keyword-memorisation failure modes.
 
     Responsibilities
     ----------------
@@ -196,6 +266,8 @@ class RobertaNLPService:
       tokeniser from the local ``./NaviAble_RoBERTa_Final/`` directory.
     - Accept a raw review string and return a structured classification.
     - Apply a ``genuine_threshold`` to guard against borderline positives.
+    - In demo mode, perform lightweight keyword analysis instead of real
+      inference so the frontend can be demonstrated without model weights.
 
     Attributes
     ----------
@@ -226,11 +298,11 @@ class RobertaNLPService:
     def initialize(self) -> None:
         """Load RoBERTa weights and tokeniser into memory.
 
-        Device selection follows the hardware constraint documented in
-        ``CONSTRAINTS_AND_RULES.md``: RoBERTa defaults to CPU to avoid
-        CUDA OOM when YOLOv11 is simultaneously occupying VRAM.  Set the
-        ``ROBERTA_DEVICE`` environment variable to ``"cuda"`` (or the CUDA
-        device index as an integer string, e.g. ``"0"``) to override.
+        Device selection follows the hardware constraint: RoBERTa defaults
+        to CPU to avoid CUDA OOM when YOLOv11 is simultaneously occupying
+        VRAM.  Set the ``ROBERTA_DEVICE`` environment variable to ``"cuda"``
+        (or the CUDA device index as an integer string, e.g. ``"0"``) to
+        override.
 
         Raises
         ------
@@ -254,7 +326,7 @@ class RobertaNLPService:
             device = 0 if (env_device.lower() == "cuda" and torch.cuda.is_available()) else -1
 
         try:
-            logger.info("Loading RoBERTa from %s on device=%s …", self.model_dir, device)
+            logger.info("Loading RoBERTa from %s on device=%s ...", self.model_dir, device)
             self._pipeline = pipeline(
                 "text-classification",
                 model=self.model_dir,
@@ -295,12 +367,15 @@ class RobertaNLPService:
         -------
         InferenceResult
             A dictionary with keys:
+
             - ``is_genuine`` (bool): True if Class-1 probability exceeds
               ``genuine_threshold``.
             - ``confidence`` (float): Model probability for the predicted class.
             - ``label`` (str): Human-readable label string.
         """
         if self._pipeline is None:
+            if _is_demo_mode():
+                return self._demo_classify(text)
             logger.warning("RoBERTa pipeline not loaded; returning stub result.")
             return {
                 "is_genuine": False,
@@ -325,6 +400,56 @@ class RobertaNLPService:
             "is_genuine": is_genuine,
             "confidence": round(confidence, 4),
             "label": self._label_map.get(hf_label, hf_label),
+        }
+
+    def _demo_classify(self, text: str) -> InferenceResult:
+        """Perform lightweight keyword-based classification for demo mode.
+
+        This is NOT a substitute for the trained RoBERTa model.  It is a
+        simple heuristic that counts genuine-accessibility keyword matches in
+        the review text to produce plausible-looking output for live demos.
+
+        Scoring heuristic
+        -----------------
+        - 0 keyword matches: ``is_genuine=False``, confidence approx 0.12-0.25
+        - 1 keyword match:   ``is_genuine=True``,  confidence approx 0.76
+        - 2+ keyword matches: ``is_genuine=True``, confidence approx 0.80-0.96
+          (capped at 0.96 to avoid artificially perfect scores)
+
+        Parameters
+        ----------
+        text : str
+            The raw review text.
+
+        Returns
+        -------
+        InferenceResult
+            Plausible synthetic NLP classification result.
+        """
+        text_lower = text.lower()
+        matches = [kw for kw in _GENUINE_KEYWORDS if kw in text_lower]
+        num = len(matches)
+
+        if num == 0:
+            # No accessibility keywords -> likely generic praise
+            confidence = round(0.10 + (len(text) % 15) / 100, 4)
+            return {
+                "is_genuine": False,
+                "confidence": confidence,
+                "label": self._label_map["LABEL_0"],
+            }
+
+        # Scale confidence with number of distinct keyword matches
+        base = 0.76 + min(num - 1, 5) * 0.04
+        confidence = round(min(base, 0.96), 4)
+        logger.info(
+            "DEMO MODE: NLP classified as genuine (keywords=%s, conf=%.2f).",
+            matches[:3], confidence,
+        )
+        return {
+            "is_genuine": True,
+            "confidence": confidence,
+            "label": self._label_map["LABEL_1"],
         }
 
 
