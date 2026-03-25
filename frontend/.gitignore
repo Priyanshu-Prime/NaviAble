@@ -1,0 +1,29 @@
+# Flutter / Dart build artefacts
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+*.iml
+
+# IDE
+.idea/
+*.iws
+*.ipr
+.vscode/
+
+# macOS
+.DS_Store
+
+# iOS/Android (not used for web-only Flutter, but kept for completeness)
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+android/.gradle
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/**/GeneratedPluginRegistrant.java
+
+# Pub cache
+.pub-cache/
+.pub/

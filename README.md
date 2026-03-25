@@ -24,17 +24,24 @@ uvicorn app.main:app --reload --port 8000
 
 Open **http://localhost:8000/docs** for the interactive Swagger UI.
 
-### Frontend Web App
+### Flutter Web Frontend
 
 In a second terminal:
 
 ```bash
 cd frontend/
-npm install
-npm run dev
+flutter pub get
+flutter run -d chrome
 ```
 
-Open **http://localhost:5173** — upload a photo, write a review, and watch the Dual-AI pipeline return a Trust Score with YOLO bounding boxes.
+Open the URL printed by Flutter (e.g. **http://localhost:PORT**) — upload a photo, write a review, and watch the Dual-AI pipeline return a Trust Score.
+
+> **Windows PowerShell note**: the commands are identical; ensure the Flutter SDK is on your `$PATH`.
+
+To target a non-localhost backend:
+```bash
+flutter run -d chrome --dart-define=API_BASE_URL=http://your-server:8000
+```
 
 ---
 
@@ -45,7 +52,7 @@ Open **http://localhost:5173** — upload a photo, write a review, and watch the
 │                    NaviAble Platform                         │
 │                                                              │
 │  ┌─────────────┐      POST /api/v1/verify                    │
-│  │  React Web  │─────────────────────────────────►┐          │
+│  │  Flutter Web │─────────────────────────────────►┐          │
 │  │  Frontend   │◄────────────────────────────────┐│          │
 │  └─────────────┘      VerificationResponse       ││          │
 │                                                  ││          │
@@ -87,17 +94,17 @@ NaviAble/
 │   ├── requirements.txt
 │   └── README.md                  # Backend docs
 │
-├── frontend/                      # React + Vite web demo
-│   ├── src/
-│   │   ├── App.jsx                # Root component + state machine
-│   │   ├── App.css                # All styles
-│   │   ├── api/client.js          # API client (fetchHealth, verifyAccessibility)
-│   │   └── components/
-│   │       ├── SubmitForm.jsx     # Drag-drop upload + text form
-│   │       ├── Results.jsx        # Full results panel
-│   │       ├── TrustScoreMeter.jsx# SVG circular gauge
-│   │       └── DetectionViewer.jsx# Image + YOLO bounding boxes
-│   ├── package.json
+├── frontend/                      # Flutter Web frontend
+│   ├── lib/
+│   │   ├── main.dart              # Entry point (ProviderScope + NaviAbleApp)
+│   │   ├── theme/app_theme.dart   # WCAG AA colour palette + MaterialTheme
+│   │   ├── models/                # API response data classes
+│   │   ├── api/api_client.dart    # Dio HTTP client with logging interceptor
+│   │   ├── providers/             # Riverpod state management
+│   │   ├── widgets/               # TrustScoreGauge, NlpResultCard, DetectionResultCard, SubmitForm
+│   │   └── screens/home_screen.dart  # Responsive two-column layout
+│   ├── web/index.html             # Flutter web host HTML
+│   ├── pubspec.yaml               # Flutter dependencies
 │   └── README.md                  # Frontend docs
 │
 ├── yolo/                          # YOLOv11 training scripts
@@ -214,7 +221,8 @@ python nlp/test_roberta.py
 - [Ultralytics YOLOv11 Docs](https://docs.ultralytics.com/)
 - [Hugging Face Transformers](https://huggingface.co/docs/transformers/)
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Vite Documentation](https://vite.dev/)
+- [Flutter Documentation](https://docs.flutter.dev/)
+- [flutter_riverpod](https://riverpod.dev/)
 
 ---
 

@@ -68,14 +68,17 @@ class Settings:
     # Demo / development mode
     demo_mode: bool = _bool_env("NAVIABLE_DEMO_MODE", default=False)
 
-    # CORS — allowed origins for the browser frontend
+    # CORS — allowed origins for the browser frontend.
+    # Flutter Web `flutter run -d chrome` uses a randomly assigned port, so we
+    # allow all localhost ports in development.  Override via env var in prod.
     cors_origins: list[str] = _list_env(
         "NAVIABLE_CORS_ORIGINS",
         default=[
-            "http://localhost:5173",   # Vite dev server
-            "http://localhost:3000",   # Create-React-App / alternate dev
-            "http://127.0.0.1:5173",
-            "http://127.0.0.1:3000",
+            "http://localhost:5000",   # flutter build web (serve)
+            "http://localhost:8080",   # common flutter web port
+            "http://localhost:3000",   # alternate dev
+            "http://127.0.0.1:5000",
+            "http://127.0.0.1:8080",
         ],
     )
 
