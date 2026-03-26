@@ -1,4 +1,232 @@
-# NaviAble - Object Detection & Review Integrity for Accessibility
+# NaviAble — AI-Powered Accessibility Verification Platform
+
+NaviAble is a community-driven accessibility platform built for the **IIIT Trichy Final Year Project (Team 7)**.  It uses a **Dual-AI Verification Architecture** — YOLOv11 for physical infrastructure detection and a fine-tuned RoBERTa model for review authenticity — to combat "accessibility washing" and give specially-abled users trustworthy information about whether a location is genuinely accessible.
+
+---
+
+## Running the Full Demo (5 minutes)
+
+### Backend
+
+```bash
+cd backend/
+pip install -r requirements.txt
+
+# Demo mode — realistic synthetic results, no GPU required
+NAVIABLE_DEMO_MODE=true uvicorn app.main:app --reload --port 8000
+```
+
+Windows PowerShell:
+```powershell
+$env:NAVIABLE_DEMO_MODE="true"
+uvicorn app.main:app --reload --port 8000
+```
+
+Open **http://localhost:8000/docs** for the interactive Swagger UI.
+
+### Flutter Web Frontend
+
+In a second terminal:
+
+```bash
+cd frontend/
+flutter pub get
+flutter run -d chrome
+```
+
+Open the URL printed by Flutter (e.g. **http://localhost:PORT**) — upload a photo, write a review, and watch the Dual-AI pipeline return a Trust Score.
+
+> **Windows PowerShell note**: the commands are identical; ensure the Flutter SDK is on your `$PATH`.
+
+To target a non-localhost backend:
+```bash
+flutter run -d chrome --dart-define=API_BASE_URL=http://your-server:8000
+```
+
+---
+
+## Architecture Overview
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    NaviAble Platform                         │
+│                                                              │
+│  ┌─────────────┐      POST /api/v1/verify                    │
+│  │  Flutter Web │─────────────────────────────────►┐          │
+│  │  Frontend   │◄────────────────────────────────┐│          │
+│  └─────────────┘      VerificationResponse       ││          │
+│                                                  ││          │
+│  ┌───────────────────────────────────────────────┼┼───────┐  │
+│  │              FastAPI Backend                  ││       │  │
+│  │                                               ││       │  │
+│  │  asyncio.gather() ──────────────────────────► ┘│       │  │
+│  │       │                                        │       │  │
+│  │       ├──► asyncio.to_thread ──► YOLOv11 ──► Vision   │  │
+│  │       │                         (ramps,        Result  │  │
+│  │       │                          handrails…)   │       │  │
+│  │       │                                        │       │  │
+│  │       └──► asyncio.to_thread ──► RoBERTa ──► NLP      │  │
+│  │                                 (genuine vs    Result  │  │
+│  │                                  generic)      │       │  │
+│  │                                                │       │  │
+│  │  Trust Score = 0.60×vision + 0.40×NLP ◄───────┘       │  │
+│  └───────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Project Structure
+
+```
+NaviAble/
+├── backend/                       # FastAPI backend (Python)
+│   ├── app/
+│   │   ├── main.py                # App entry, CORS, lifespan
+│   │   ├── core/config.py         # Env-var settings (DEMO_MODE, CORS)
+│   │   ├── api/routers/
+│   │   │   ├── verify.py          # POST /api/v1/verify
+│   │   │   └── health.py          # GET /health
+│   │   ├── schemas/verify.py      # Pydantic v2 response models
+│   │   └── services/ml.py         # YoloVisionService + RobertaNLPService
+│   ├── tests/
+│   │   └── test_verify_api.py     # 23 TDD unit tests (all passing)
+│   ├── requirements.txt
+│   └── README.md                  # Backend docs
+│
+├── frontend/                      # Flutter Web frontend
+│   ├── lib/
+│   │   ├── main.dart              # Entry point (ProviderScope + NaviAbleApp)
+│   │   ├── theme/app_theme.dart   # WCAG AA colour palette + MaterialTheme
+│   │   ├── models/                # API response data classes
+│   │   ├── api/api_client.dart    # Dio HTTP client with logging interceptor
+│   │   ├── providers/             # Riverpod state management
+│   │   ├── widgets/               # TrustScoreGauge, NlpResultCard, DetectionResultCard, SubmitForm
+│   │   └── screens/home_screen.dart  # Responsive two-column layout
+│   ├── web/index.html             # Flutter web host HTML
+│   ├── pubspec.yaml               # Flutter dependencies
+│   └── README.md                  # Frontend docs
+│
+├── yolo/                          # YOLOv11 training scripts
+├── nlp/                           # RoBERTa training scripts
+├── .agent/                        # AI agent context and workflows
+└── README.md                      # This file
+```
+
+---
+
+## Model Performance
+
+| Model    | Metric           | Value    |
+|----------|------------------|----------|
+| YOLOv11  | mAP@0.5          | 47.29 %  |
+| YOLOv11  | Precision        | 58.99 %  |
+| YOLOv11  | Recall           | 46.34 %  |
+| YOLOv11  | Training Epochs  | 25       |
+| RoBERTa  | Val Accuracy     | 87.65 %  |
+| RoBERTa  | Training Epochs  | 5        |
+| RoBERTa  | Dataset Size     | 402 rows |
+
+---
+
+## Trust Score Formula
+
+```
+NaviAble Trust Score = 0.60 × mean(YOLO confidence) + 0.40 × RoBERTa confidence
+```
+
+| Range     | Interpretation                     |
+|-----------|------------------------------------|
+| ≥ 0.70    | Strong evidence of accessibility   |
+| 0.40–0.69 | Partial evidence                   |
+| < 0.40    | Insufficient evidence              |
+
+---
+
+## Backend API Reference
+
+| Endpoint              | Method | Description                              |
+|-----------------------|--------|------------------------------------------|
+| `/api/v1/verify`      | POST   | Dual-AI verification (multipart/form)    |
+| `/health`             | GET    | Backend health + ML service status       |
+| `/docs`               | GET    | Swagger UI                               |
+| `/redoc`              | GET    | ReDoc                                    |
+
+See `backend/README.md` for full request/response schemas and environment variables.
+
+---
+
+## Environment Variables
+
+| Variable             | Default | Description                                  |
+|----------------------|---------|----------------------------------------------|
+| `NAVIABLE_DEMO_MODE` | `false` | Return synthetic results without model weights |
+| `YOLO_MODEL_PATH`    | `./models/yolov11_naviable.pt` | YOLOv11 weights path |
+| `ROBERTA_MODEL_DIR`  | `./NaviAble_RoBERTa_Final`     | RoBERTa model dir    |
+| `ROBERTA_DEVICE`     | `cpu`   | `cpu` or `cuda`                              |
+
+---
+
+## ML Training Scripts
+
+### YOLO Object Detection
+
+```bash
+# Prepare dataset
+python yolo/convert_annotations.py
+python yolo/split_data.py
+
+# Train (25 epochs, GTX 1650 Ti)
+python yolo/train_yolo.py
+```
+
+### RoBERTa NLP Engine
+
+```bash
+# Build dataset (LLM Knowledge Distillation via Groq API)
+python nlp/generate_llm_labels.py
+python nlp/merge_data.py
+
+# Train (5 epochs)
+python nlp/train_roberta.py
+
+# Interactive testing
+python nlp/test_roberta.py
+```
+
+---
+
+## Prerequisites
+
+- Python 3.10+
+- Node.js 18+
+- GPU optional (NVIDIA GTX 1650 Ti or better for real model inference)
+
+---
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Backend unreachable | Ensure `uvicorn` is running on port 8000 |
+| Empty detection results | Set `NAVIABLE_DEMO_MODE=true` |
+| CUDA OOM | Set `ROBERTA_DEVICE=cpu` (default) |
+| Frontend CORS error | Check `NAVIABLE_CORS_ORIGINS` includes your frontend origin |
+| Virtual env activation (Windows) | `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` |
+
+---
+
+## Resources
+
+- [Ultralytics YOLOv11 Docs](https://docs.ultralytics.com/)
+- [Hugging Face Transformers](https://huggingface.co/docs/transformers/)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [Flutter Documentation](https://docs.flutter.dev/)
+- [flutter_riverpod](https://riverpod.dev/)
+
+---
+
+*IIIT Trichy B.Tech CSE Final Year Project 2024 — Team 7*
 
 NaviAble is a dual-module accessibility system combining **YOLO object detection** with a **RoBERTa-based NLP integrity engine** to support safer navigation and trustworthy accessibility information.
 

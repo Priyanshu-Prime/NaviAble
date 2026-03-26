@@ -1,0 +1,55 @@
+name: naviable
+description: >
+  NaviAble — Community-driven AI-powered Accessibility Verification Platform.
+  Connects to the FastAPI backend (YOLOv11 + RoBERTa) to verify whether
+  locations are genuinely accessible based on user-submitted photos and reviews.
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: '>=3.22.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ── State Management ────────────────────────────────────────────────────
+  # flutter_riverpod: Reactive, compile-time safe state management.
+  # Chosen over Provider and Bloc for its simplicity and testability.
+  flutter_riverpod: ^2.5.1
+
+  # ── HTTP Client ────────────────────────────────────────────────────────
+  # dio: Feature-rich HTTP client with Interceptors for JWT, logging,
+  # and retry logic. Required by the .agent skill specification.
+  dio: ^5.4.3
+
+  # ── Image Compression ─────────────────────────────────────────────────
+  # flutter_image_compress: Pre-compress uploaded images before sending
+  # to the FastAPI backend. Critical to prevent CUDA OOM on the GTX 1650 Ti
+  # (4 GB VRAM) when YOLO loads large images.
+  flutter_image_compress: ^2.2.0
+
+  # ── Image Picking ─────────────────────────────────────────────────────
+  # image_picker: Cross-platform gallery / camera access.
+  # Web: opens file picker dialog. Mobile: opens gallery or camera.
+  image_picker: ^1.1.2
+
+  # ── UUID Generation ───────────────────────────────────────────────────
+  # uuid: Generates RFC 4122 UUIDs for location_id form field.
+  uuid: ^4.4.0
+
+  # ── UI / Icons ────────────────────────────────────────────────────────
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/
