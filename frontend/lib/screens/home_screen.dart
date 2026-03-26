@@ -100,9 +100,9 @@ class HomeScreen extends ConsumerWidget {
 // ── Two-Column Layout ─────────────────────────────────────────────────────────
 
 class _TwoColumnLayout extends StatelessWidget {
-  final VerifyState verifyState;
 
   const _TwoColumnLayout({required this.verifyState});
+  final VerifyState verifyState;
 
   @override
   Widget build(BuildContext context) {
@@ -133,9 +133,9 @@ class _TwoColumnLayout extends StatelessWidget {
 // ── Single-Column Layout ──────────────────────────────────────────────────────
 
 class _SingleColumnLayout extends StatelessWidget {
-  final VerifyState verifyState;
 
   const _SingleColumnLayout({required this.verifyState});
+  final VerifyState verifyState;
 
   @override
   Widget build(BuildContext context) {
@@ -158,9 +158,9 @@ class _SingleColumnLayout extends StatelessWidget {
 // ── Results Panel ─────────────────────────────────────────────────────────────
 
 class _ResultsPanel extends ConsumerWidget {
-  final VerifyState verifyState;
 
   const _ResultsPanel({required this.verifyState});
+  final VerifyState verifyState;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -246,15 +246,15 @@ class _IdlePlaceholder extends StatelessWidget {
 }
 
 class _HowItWorksTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String detail;
 
   const _HowItWorksTile({
     required this.icon,
     required this.title,
     required this.detail,
   });
+  final IconData icon;
+  final String title;
+  final String detail;
 
   @override
   Widget build(BuildContext context) {
@@ -347,9 +347,9 @@ class _LoadingPanel extends StatelessWidget {
 // ── Success Panel ─────────────────────────────────────────────────────────────
 
 class _SuccessPanel extends ConsumerWidget {
-  final VerificationResponse response;
 
   const _SuccessPanel({required this.response});
+  final VerificationResponse response;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -407,9 +407,9 @@ class _SuccessPanel extends ConsumerWidget {
 // ── Error Panel ───────────────────────────────────────────────────────────────
 
 class _ErrorPanel extends ConsumerWidget {
-  final String message;
 
   const _ErrorPanel({required this.message});
+  final String message;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -474,9 +474,9 @@ class _ErrorPanel extends ConsumerWidget {
 // ── Health Badge ──────────────────────────────────────────────────────────────
 
 class _HealthBadge extends StatelessWidget {
-  final HealthResponse? health;
 
   const _HealthBadge({required this.health});
+  final HealthResponse? health;
 
   @override
   Widget build(BuildContext context) {
@@ -504,8 +504,8 @@ class _HealthBadge extends StatelessWidget {
       );
     }
 
-    final isOnline = health.status == 'ok';
-    final isDemoMode = health.demoMode;
+    final isOnline = health?.status == 'ok';
+    final isDemoMode = health?.demoMode ?? false;
 
     return Semantics(
       label: 'Backend status: ${isOnline ? "online" : "offline"}'

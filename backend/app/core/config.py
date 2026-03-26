@@ -74,11 +74,7 @@ class Settings:
     cors_origins: list[str] = _list_env(
         "NAVIABLE_CORS_ORIGINS",
         default=[
-            "http://localhost:5000",   # flutter build web (serve)
-            "http://localhost:8080",   # common flutter web port
-            "http://localhost:3000",   # alternate dev
-            "http://127.0.0.1:5000",
-            "http://127.0.0.1:8080",
+            "*"
         ],
     )
 

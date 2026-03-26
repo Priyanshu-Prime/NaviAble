@@ -9,6 +9,7 @@
 /// testable without a Flutter widget tree.
 library providers;
 
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:uuid/uuid.dart';
@@ -60,14 +61,14 @@ final class VerifyLoading extends VerifyState {
 
 /// Verification completed successfully.
 final class VerifySuccess extends VerifyState {
-  final VerificationResponse response;
   const VerifySuccess(this.response);
+  final VerificationResponse response;
 }
 
 /// Verification failed due to a network or server error.
 final class VerifyError extends VerifyState {
-  final String message;
   const VerifyError(this.message);
+  final String message;
 }
 
 // ── Verify Notifier ─────────────────────────────────────────────────────────
@@ -108,7 +109,7 @@ class VerifyNotifier extends Notifier<VerifyState> {
       // This drastically reduces upload size while preserving enough
       // detail for YOLOv11 to detect ramps, handrails, etc.
       final compressed = await FlutterImageCompress.compressWithList(
-        imageBytes is List<int> ? imageBytes as List<int> : imageBytes.toList(),
+        Uint8List.fromList(imageBytes),
         minWidth: 1024,
         minHeight: 1024,
         quality: 85,
