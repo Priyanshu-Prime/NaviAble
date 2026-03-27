@@ -344,6 +344,11 @@ class RobertaNLPService:
             )
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to load RoBERTa: %s", exc)
+            if _is_demo_mode():
+                logger.warning(
+                    "DEMO MODE: proceeding without RoBERTa due to model load failure."
+                )
+                return
             raise RuntimeError(f"RoBERTa initialisation failed: {exc}") from exc
 
     def classify(self, text: str) -> InferenceResult:
