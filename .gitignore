@@ -26,11 +26,6 @@ stair-and-ramp-2/
 runs/
 NaviAble_Week5/
 
-# ──── RoBERTa Model Outputs ────
-NaviAble_RoBERTa/
-NaviAble_RoBERTa_Checkpoints/
-NaviAble_RoBERTa_Final/
-
 # ──── Generated Data Files ────
 accessibility_reviews.csv
 production_roberta_dataset.csv
@@ -40,11 +35,3 @@ gold_standard_labels_groq.csv
 new_mined_data.csv
 NaviAble_Final_Training_Data.csv
 merge_data.csv
-
-# ──── Graph Outputs ────
-*.png
-
-# ──── RoBERTa Model Artifacts ────
-NaviAble_RoBERTa/
-NaviAble_RoBERTa_Final/
-NaviAble_RoBERTa_Checkpoints/
