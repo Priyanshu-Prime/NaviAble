@@ -1,6 +1,7 @@
 import os
 import sys
 import warnings
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config import ROBERTA_FINAL_DIR
@@ -11,16 +12,41 @@ from transformers import pipeline
 warnings.filterwarnings("ignore")
 
 
+def _resolve_model_path() -> str:
+    """
+    Resolve which model to load:
+    1) If NAVIABLE_ROBERTA_MODEL is set, use it (either HF repo id or local dir).
+    2) Else if local trained dir exists (ROBERTA_FINAL_DIR with config.json), use it.
+    3) Else fall back to 'roberta-base' (downloads from Hugging Face).
+    """
+    env_override = os.getenv("NAVIABLE_ROBERTA_MODEL")
+    if env_override:
+        print(f"Using NAVIABLE_ROBERTA_MODEL={env_override}")
+        return env_override
+
+    trained_dir = Path(ROBERTA_FINAL_DIR)
+    if trained_dir.is_dir() and (trained_dir / "config.json").exists():
+        return str(trained_dir)
+
+    print(
+        "Local trained model not found or incomplete; falling back to 'roberta-base'.\n"
+        "To use a local trained model, train first:\n"
+        "  python3 nlp/train_roberta.py\n"
+        "Or set NAVIABLE_ROBERTA_MODEL to a local path or HF repo id."
+    )
+    return "roberta-base"
+
+
 def interactive_integrity_engine():
-    model_path = str(ROBERTA_FINAL_DIR)
+    model_id_or_path = _resolve_model_path()
     device = 0 if torch.cuda.is_available() else -1
 
     print("Loading NaviAble Integrity Module (RoBERTa)...")
     try:
         classifier = pipeline(
             "text-classification",
-            model=model_path,
-            tokenizer=model_path,
+            model=model_id_or_path,
+            tokenizer=model_id_or_path,
             device=device,
         )
     except Exception as e:

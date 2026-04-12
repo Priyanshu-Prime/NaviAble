@@ -59,6 +59,7 @@ async def health_check(request: Request) -> dict:
     roberta_svc = getattr(request.app.state, "roberta_service", None)
 
     yolo_status = "loaded" if (yolo_svc and getattr(yolo_svc, "_model", None)) else "stub"
+    clip_status = "loaded" if (yolo_svc and getattr(yolo_svc, "_clip_model", None)) else "stub"
     roberta_status = "loaded" if (roberta_svc and getattr(roberta_svc, "_pipeline", None)) else "stub"
 
     return {
@@ -67,6 +68,7 @@ async def health_check(request: Request) -> dict:
         "demo_mode": settings.demo_mode,
         "services": {
             "yolo": yolo_status,
+            "clip": clip_status,
             "roberta": roberta_status,
         },
     }

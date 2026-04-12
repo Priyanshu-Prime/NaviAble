@@ -33,6 +33,11 @@ ROBERTA_DEVICE : str (default: cpu)
     Device to load RoBERTa on.  Use ``cuda`` or a device index (``0``)
     to load on GPU.  Defaults to CPU to avoid VRAM contention with YOLO
     on limited hardware (GTX 1650 Ti, 4 GB).
+
+ENABLE_HYBRID_CLIP : bool (default: true)
+    When ``true``, the backend vision service attempts to load the CLIP
+    hybrid classifier for accessibility labels.  Set this to ``false`` for
+    a faster lightweight startup that falls back to YOLO-only detection.
 """
 
 from __future__ import annotations
@@ -85,6 +90,7 @@ class Settings:
     roberta_model_dir: str = os.environ.get(
         "ROBERTA_MODEL_DIR", "./NaviAble_RoBERTa_Final"
     )
+    enable_hybrid_clip: bool = _bool_env("ENABLE_HYBRID_CLIP", default=True)
 
 
 # Module-level singleton — import this everywhere

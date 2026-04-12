@@ -1,0 +1,6 @@
+path: /Users/vedantsunillande/spot-repo/NaviAble/NaviAble/NaviAble_Dataset
+train: train_aug_ramps/images
+val: valid/images
+nc: 4
+names: [ 'step', 'stair', 'ramp', 'grab_bar' ]
+

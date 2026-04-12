@@ -1,0 +1,10 @@
+path: /Users/vedantsunillande/spot-repo/NaviAble/NaviAble/NaviAble_Dataset
+
+# Overfit test: use the original train folder for both train and val
+train: train/images
+val: train/images
+test: test/images
+
+nc: 4
+names: ['step','stair','ramp','grab_bar']
+

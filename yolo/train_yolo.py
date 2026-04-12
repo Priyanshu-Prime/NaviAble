@@ -9,14 +9,14 @@ from ultralytics import YOLO
 if __name__ == "__main__":
     model = YOLO("yolo11n.pt")
 
-    dataset_yaml = str(PROJECT_ROOT / "stair-and-ramp-2" / "data.yaml")
+    dataset_yaml = str("/Users/vedantsunillande/spot-repo/NaviAble/NaviAble/data.yaml")
 
     print("Starting YOLO Training on Roboflow Dataset...")
     results = model.train(
         data=dataset_yaml,
         epochs=25,
         imgsz=640,
-        device="cuda",
+        device="mps",
         project="NaviAble_Week5",
         name="YOLOv11_Roboflow_Dataset",
         batch=8,

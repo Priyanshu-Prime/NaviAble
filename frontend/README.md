@@ -42,7 +42,7 @@ Install Flutter: https://docs.flutter.dev/get-started/install
 ```bash
 # 1. Start the FastAPI backend first (from the repo root)
 cd ../backend
-NAVIABLE_DEMO_MODE=true uvicorn app.main:app --reload --port 8000
+NAVIABLE_DEMO_MODE=true ENABLE_HYBRID_CLIP=false uvicorn app.main:app --reload --port 8000
 
 # 2. In a new terminal, install Flutter deps and run the web app
 cd ../frontend
@@ -95,3 +95,8 @@ contrast ratios meet **WCAG AA** (4.5:1 for body text).
 | `--dart-define` key | Default | Description |
 |---------------------|---------|-------------|
 | `API_BASE_URL` | `http://localhost:8000` | FastAPI backend base URL |
+
+If you want the backend to use the CLIP hybrid classifier instead of YOLO-only
+vision, start it with `ENABLE_HYBRID_CLIP=true` (it is safe to leave it off
+for quick demo startup).
+

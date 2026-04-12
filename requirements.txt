@@ -6,9 +6,11 @@ Pillow>=10.0.0
 numpy>=1.24.0
 torch>=2.0.0
 torchvision>=0.15.0
+pyshp>=2.3.1
 
 # ──── NLP / RoBERTa Integrity Module ────
 transformers>=4.30.0
+accelerate>=0.26.0
 datasets>=2.14.0
 evaluate>=0.4.0
 pandas>=2.0.0

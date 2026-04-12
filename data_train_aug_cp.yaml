@@ -1,0 +1,10 @@
+path: /Users/vedantsunillande/spot-repo/NaviAble/NaviAble/NaviAble_Dataset
+
+# Use the augmented train folder created by copy_paste_augment.py
+train: train_aug_cp/images
+val: valid/images
+test: test/images
+
+nc: 4
+names: ['step','stair','ramp','grab_bar']
+

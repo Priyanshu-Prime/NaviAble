@@ -1,0 +1,10 @@
+path: /Users/vedantsunillande/spot-repo/NaviAble/NaviAble/NaviAble_Dataset
+
+# Use the class-balanced augmented train folder created by augment_class_aware.py (iteration 2)
+train: train_aug_cp2_classbal/images
+val: valid/images
+test: test/images
+
+nc: 4
+names: ['step','stair','ramp','grab_bar']
+

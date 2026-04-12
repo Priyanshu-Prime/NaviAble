@@ -1,0 +1,7 @@
+path: /Users/vedantsunillande/spot-repo/NaviAble/NaviAble/NaviAble_Dataset
+train: train_aug_cp_ramp_v2/images
+val: valid/images
+test: test/images
+nc: 3
+names: ['step', 'stair', 'ramp']
+

@@ -1,5 +1,6 @@
 # ──── Environment / Secrets ────
 .env
+.venv/
 
 # ──── Virtual Environment ────
 venv/
@@ -15,16 +16,29 @@ Thumbs.db
 
 # ──── YOLO Model Weights ────
 *.pt
+*.bin
+*.safetensors
 
 # ──── Datasets & Images ────
 dataset/
 NaviAble_Dataset/
 labels_out/
 stair-and-ramp-2/
+Ramps_v2/
+ramp_exports/
+
+# ──── Local Model Checkpoints / Artifacts ────
+NaviAble_RoBERTa_Checkpoints/
+NaviAble_RoBERTa_Final/
+models/
 
 # ──── YOLO Training Outputs ────
 runs/
 NaviAble_Week5/
+
+# ──── Logs / Temp Outputs ────
+*.log
+nohup.out
 
 # ──── Generated Data Files ────
 accessibility_reviews.csv

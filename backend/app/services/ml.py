@@ -54,6 +54,8 @@ from typing import Any
 
 import numpy as np
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -84,6 +86,84 @@ _DEMO_DETECTION_POOL: list[dict[str, Any]] = [
     {"class": "accessible_doorway","confidence": 0.63, "bbox": [80,  30,  320, 420]},
     {"class": "tactile_paving",    "confidence": 0.58, "bbox": [20,  400, 500, 480]},
 ]
+
+_ACCESSIBILITY_PROMPTS: dict[str, list[str]] = {
+    "ramp": [
+        "a wheelchair ramp",
+        "a sloped accessibility ramp",
+        "a ramp for disabled access",
+        "an outdoor wheelchair ramp",
+    ],
+    "stair": [
+        "a staircase",
+        "a staircase with multiple steps",
+        "stairs in a building",
+        "an indoor staircase",
+    ],
+    "step": [
+        "a single step",
+        "a small stair step",
+        "one step in a walkway",
+        "a curb step",
+    ],
+    "guard rail": [
+        "a guard rail",
+        "a handrail beside stairs",
+        "a metal handrail",
+        "a safety rail next to steps",
+    ],
+    "negative": [
+        "flat ground",
+        "no accessibility structure",
+        "an empty sidewalk",
+        "plain pavement",
+    ],
+}
+
+_ACCESSIBILITY_ORDER = ["ramp", "stair", "step", "guard rail", "negative"]
+
+
+def _resolve_clip_device() -> str:
+    import torch  # type: ignore[import-untyped]
+
+    if torch.backends.mps.is_available():
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
+
+
+def _build_accessibility_inventory() -> tuple[list[str], dict[str, slice]]:
+    prompts: list[str] = []
+    class_slices: dict[str, slice] = {}
+    start = 0
+    for cls in _ACCESSIBILITY_ORDER:
+        cls_prompts = _ACCESSIBILITY_PROMPTS[cls]
+        prompts.extend(cls_prompts)
+        class_slices[cls] = slice(start, start + len(cls_prompts))
+        start += len(cls_prompts)
+    return prompts, class_slices
+
+
+def _best_accessibility_label(probs: Any, class_slices: dict[str, slice]) -> tuple[str, float]:
+    class_scores: dict[str, float] = {}
+    for cls in _ACCESSIBILITY_ORDER:
+        idx_slice = class_slices[cls]
+        class_scores[cls] = float(probs[idx_slice].mean().item())
+
+    positive_scores = {k: v for k, v in class_scores.items() if k != "negative"}
+    best_positive = max(positive_scores, key=positive_scores.get)
+    best_positive_score = positive_scores[best_positive]
+    negative_score = class_scores["negative"]
+
+    if negative_score >= best_positive_score or best_positive_score < 0.15:
+        return "negative", negative_score
+    return best_positive, best_positive_score
+
+
+def _make_clip_inputs(clip_processor: Any, prompts: list[str], images: list[Any], device: str) -> dict[str, Any]:
+    inputs = clip_processor(text=prompts, images=images, return_tensors="pt", padding=True)
+    return {k: v.to(device) for k, v in inputs.items()}
 
 
 def _is_demo_mode() -> bool:
@@ -139,6 +219,9 @@ class YoloVisionService:
         self.model_path = model_path
         self.conf_threshold = conf_threshold
         self._model: Any = None
+        self._clip_model: Any = None
+        self._clip_processor: Any = None
+        self._clip_device: str = "cpu"
 
     def initialize(self) -> None:
         """Load YOLOv11 weights into memory.
@@ -161,7 +244,7 @@ class YoloVisionService:
             logger.info("Loading YOLOv11 weights from %s ...", self.model_path)
             self._model = YOLO(self.model_path)
             logger.info("YOLOv11 loaded successfully.")
-        except (ImportError, ModuleNotFoundError):
+        except ImportError:
             logger.warning(
                 "ultralytics package not installed. "
                 "YOLOv11 running in stub mode (no real inference)."
@@ -175,6 +258,27 @@ class YoloVisionService:
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to load YOLOv11: %s", exc)
             raise RuntimeError(f"YOLOv11 initialisation failed: {exc}") from exc
+
+        try:
+            import torch  # type: ignore[import-untyped]
+            from transformers import CLIPModel, CLIPProcessor  # type: ignore[import-untyped]
+
+            if not settings.enable_hybrid_clip:
+                logger.info("Hybrid CLIP loading disabled by ENABLE_HYBRID_CLIP=false.")
+                return
+
+            self._clip_device = _resolve_clip_device()
+            clip_model_name = os.environ.get("CLIP_MODEL_NAME", "openai/clip-vit-base-patch32")
+            logger.info("Loading CLIP model %s on %s ...", clip_model_name, self._clip_device)
+            self._clip_processor = CLIPProcessor.from_pretrained(clip_model_name)
+            self._clip_model = CLIPModel.from_pretrained(clip_model_name)
+            self._clip_model.to(self._clip_device)
+            self._clip_model.eval()
+            logger.info("CLIP loaded successfully.")
+        except ImportError:
+            logger.warning("transformers CLIP components not installed. Hybrid inference disabled; falling back to YOLO-only vision.")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("CLIP initialisation failed (%s). Falling back to YOLO-only vision.", exc)
 
     def predict(self, image_bytes: bytes) -> InferenceResult:
         """Run YOLOv11 inference on raw image bytes.
@@ -199,10 +303,15 @@ class YoloVisionService:
               ``confidence``, and ``bbox`` (``[x1, y1, x2, y2]``).
         """
         if self._model is None:
+            if self._clip_model is not None and self._clip_processor is not None:
+                return self._clip_only_predict(image_bytes)
             if _is_demo_mode():
                 return self._demo_predict(image_bytes)
             logger.warning("YOLOv11 model not loaded; returning empty result.")
             return {"objects_detected": 0, "features": []}
+
+        if self._clip_model is not None and self._clip_processor is not None:
+            return self._hybrid_predict(image_bytes)
 
         # Convert raw bytes -> numpy array via PIL to avoid disk I/O
         from PIL import Image  # type: ignore[import-untyped]
@@ -226,6 +335,96 @@ class YoloVisionService:
             )
 
         return {"objects_detected": len(features), "features": features}
+
+    def _hybrid_predict(self, image_bytes: bytes) -> InferenceResult:
+        """Run YOLO proposals and CLIP refinement for accessibility classes."""
+        from PIL import Image  # type: ignore[import-untyped]
+        import torch  # type: ignore[import-untyped]
+
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        img_array = np.array(image)
+
+        results = self._model(img_array, conf=self.conf_threshold, iou=0.45)
+        boxes = results[0].boxes
+
+        candidate_boxes: list[tuple[list[float], float]] = []
+        if boxes is not None and len(boxes) > 0:
+            for box in boxes:
+                candidate_boxes.append((box.xyxy[0].tolist(), float(box.conf[0].item())))
+        else:
+            h, w = img_array.shape[:2]
+            candidate_boxes.append(([0.0, 0.0, float(w), float(h)], self.conf_threshold))
+
+        prompts, class_slices = _build_accessibility_inventory()
+
+        crops: list[Image.Image] = []
+        kept_boxes: list[tuple[list[float], float]] = []
+        h, w = img_array.shape[:2]
+        for box, yolo_conf in candidate_boxes:
+            x1, y1, x2, y2 = [int(round(v)) for v in box]
+            x1 = max(0, min(x1, w - 1))
+            y1 = max(0, min(y1, h - 1))
+            x2 = max(0, min(x2, w))
+            y2 = max(0, min(y2, h))
+            if x2 <= x1 or y2 <= y1:
+                continue
+            crop = Image.fromarray(img_array[y1:y2, x1:x2])
+            crops.append(crop)
+            kept_boxes.append((box, yolo_conf))
+
+        if not crops:
+            return {"objects_detected": 0, "features": []}
+
+        inputs = _make_clip_inputs(self._clip_processor, prompts, crops, self._clip_device)
+
+        with torch.no_grad():
+            outputs = self._clip_model(**inputs)
+            probs = outputs.logits_per_image.softmax(dim=-1)
+
+        features: list[dict[str, Any]] = []
+        for idx, (box, yolo_conf) in enumerate(kept_boxes):
+            label, clip_score = _best_accessibility_label(probs[idx], class_slices)
+            box, yolo_conf = kept_boxes[idx]
+            fused_conf = float(0.35 * yolo_conf + 0.65 * clip_score)
+            x1, y1, x2, y2 = [int(round(v)) for v in box]
+            features.append(
+                {
+                    "class": label,
+                    "confidence": round(fused_conf, 4),
+                    "bbox": [x1, y1, x2, y2],
+                }
+            )
+
+        return {"objects_detected": len(features), "features": features}
+
+    def _clip_only_predict(self, image_bytes: bytes) -> InferenceResult:
+        """Fallback when CLIP is present but YOLO weights are unavailable."""
+        from PIL import Image  # type: ignore[import-untyped]
+        import torch  # type: ignore[import-untyped]
+
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        img_array = np.array(image)
+        h, w = img_array.shape[:2]
+
+        prompts, class_slices = _build_accessibility_inventory()
+        inputs = _make_clip_inputs(self._clip_processor, prompts, [image], self._clip_device)
+
+        with torch.no_grad():
+            outputs = self._clip_model(**inputs)
+            probs = outputs.logits_per_image.softmax(dim=-1)[0]
+
+        label, clip_score = _best_accessibility_label(probs, class_slices)
+
+        return {
+            "objects_detected": 1,
+            "features": [
+                {
+                    "class": label,
+                    "confidence": round(float(clip_score), 4),
+                    "bbox": [0, 0, w, h],
+                }
+            ],
+        }
 
     def _demo_predict(self, image_bytes: bytes) -> InferenceResult:
         """Return synthetic detections for demo/development mode.
@@ -312,7 +511,7 @@ class RobertaNLPService:
         try:
             import torch  # type: ignore[import-untyped]
             from transformers import pipeline  # type: ignore[import-untyped]
-        except (ImportError, ModuleNotFoundError):
+        except ImportError:
             logger.warning(
                 "torch / transformers packages not installed. "
                 "RoBERTa running in stub mode (no real inference)."

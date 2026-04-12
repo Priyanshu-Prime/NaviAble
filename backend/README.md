@@ -72,7 +72,7 @@ pip install -r requirements.txt
 Demo mode returns realistic synthetic results so you can see the full pipeline in action without GPU hardware or trained weights.
 
 ```bash
-NAVIABLE_DEMO_MODE=true uvicorn app.main:app --reload --port 8000
+NAVIABLE_DEMO_MODE=true ENABLE_HYBRID_CLIP=false uvicorn app.main:app --reload --port 8000
 ```
 
 On Windows PowerShell:
@@ -90,6 +90,23 @@ Place the trained weights in the following locations:
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
+
+### 5. Run RoBERTa in Terminal (same backend inference path)
+
+Use this when you want text input/output in terminal while reusing the exact
+`RobertaNLPService` used by the API.
+
+```bash
+cd backend/
+source .venv/bin/activate
+
+# If your model is in project root (../NaviAble_RoBERTa_Final), set this:
+export ROBERTA_MODEL_DIR=../NaviAble_RoBERTa_Final
+
+python -m app.cli.roberta_cli
+```
+
+Type review text and press Enter. Type `exit` to quit.
 
 ---
 
@@ -165,6 +182,7 @@ Returns service status for monitoring and the frontend connectivity check.
 | Variable               | Default                          | Description                                         |
 |------------------------|----------------------------------|-----------------------------------------------------|
 | `NAVIABLE_DEMO_MODE`   | `false`                          | Return synthetic results when models are absent     |
+| `ENABLE_HYBRID_CLIP`   | `true`                           | Load the CLIP hybrid classifier for accessibility labels |
 | `NAVIABLE_CORS_ORIGINS`| `http://localhost:5173,...`       | Comma-separated list of allowed CORS origins         |
 | `YOLO_MODEL_PATH`      | `./models/yolov11_naviable.pt`   | Path to YOLOv11 `.pt` weights                       |
 | `ROBERTA_MODEL_DIR`    | `./NaviAble_RoBERTa_Final`       | Path to HuggingFace model directory                 |
@@ -174,6 +192,7 @@ Create a `.env` file in the `backend/` directory to set these persistently:
 
 ```env
 NAVIABLE_DEMO_MODE=true
+ENABLE_HYBRID_CLIP=false
 NAVIABLE_CORS_ORIGINS=http://localhost:5173
 ```
 

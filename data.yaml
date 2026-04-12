@@ -1,11 +1,14 @@
-# Relative path to the split dataset folder (resolved from this file's location)
-path: ./NaviAble_Dataset
+# Use the absolute path to your dataset folder
+path: /Users/vedantsunillande/spot-repo/NaviAble/NaviAble/NaviAble_Dataset
 
-train: images/train
-val: images/val
+# Paths relative to the 'path' above
+# Roboflow usually exports as train/images, not images/train
+train: train/images
+val: valid/images  # Roboflow usually names this 'valid', check your folder!
+test: test/images   # Optional
 
 # Number of classes
 nc: 4
 
-# Class names (The order MUST match your conversion script)
-names: ['step', 'stair', 'ramp', 'grab_bar']
+# Class names
+names: [ 'step', 'stair', 'ramp', 'grab_bar' ]

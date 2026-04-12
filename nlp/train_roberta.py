@@ -1,12 +1,12 @@
 import os
 import sys
+import inspect
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config import PROJECT_ROOT, ROBERTA_CHECKPOINTS_DIR, ROBERTA_FINAL_DIR
 
 import pandas as pd
 import numpy as np
-import evaluate
 import torch
 from datasets import Dataset
 from transformers import (
@@ -43,39 +43,50 @@ def train_integrity_module():
     print("Step 3: Loading Pre-trained RoBERTa weights...")
     model = RobertaForSequenceClassification.from_pretrained(model_ckpt, num_labels=2)
 
-    accuracy_metric = evaluate.load("accuracy")
-
     def compute_metrics(eval_pred):
         predictions, labels = eval_pred
         predictions = np.argmax(predictions, axis=1)
-        return accuracy_metric.compute(predictions=predictions, references=labels)
+        accuracy = float((predictions == labels).mean())
+        return {"accuracy": accuracy}
 
     print("Step 4: Configuring Trainer...")
-    training_args = TrainingArguments(
-        output_dir=str(ROBERTA_CHECKPOINTS_DIR),
-        eval_strategy="epoch",
-        save_strategy="epoch",
-        learning_rate=2e-5,
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
-        num_train_epochs=5,
-        weight_decay=0.01,
-        load_best_model_at_end=True,
-        metric_for_best_model="accuracy",
-        report_to="none",
-        fp16=torch.cuda.is_available(),
-        push_to_hub=False,
-    )
+    ta_params = inspect.signature(TrainingArguments.__init__).parameters
+    training_kwargs = {
+        "output_dir": str(ROBERTA_CHECKPOINTS_DIR),
+        "save_strategy": "epoch",
+        "learning_rate": 2e-5,
+        "per_device_train_batch_size": 8,
+        "per_device_eval_batch_size": 8,
+        "num_train_epochs": 5,
+        "weight_decay": 0.01,
+        "load_best_model_at_end": True,
+        "metric_for_best_model": "accuracy",
+        "report_to": "none",
+        "fp16": torch.cuda.is_available(),
+        "push_to_hub": False,
+    }
+    if "eval_strategy" in ta_params:
+        training_kwargs["eval_strategy"] = "epoch"
+    else:
+        training_kwargs["evaluation_strategy"] = "epoch"
 
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=tokenized_ds["train"],
-        eval_dataset=tokenized_ds["test"],
-        processing_class=tokenizer,
-        data_collator=data_collator,
-        compute_metrics=compute_metrics,
-    )
+    training_args = TrainingArguments(**training_kwargs)
+
+    trainer_kwargs = {
+        "model": model,
+        "args": training_args,
+        "train_dataset": tokenized_ds["train"],
+        "eval_dataset": tokenized_ds["test"],
+        "data_collator": data_collator,
+        "compute_metrics": compute_metrics,
+    }
+    trainer_params = inspect.signature(Trainer.__init__).parameters
+    if "processing_class" in trainer_params:
+        trainer_kwargs["processing_class"] = tokenizer
+    else:
+        trainer_kwargs["tokenizer"] = tokenizer
+
+    trainer = Trainer(**trainer_kwargs)
 
     print("Step 5: Starting Training (Integrity Module)...")
     trainer.train()
