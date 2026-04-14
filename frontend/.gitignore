@@ -27,3 +27,5 @@ android/**/GeneratedPluginRegistrant.java
 # Pub cache
 .pub-cache/
 .pub/
+node_modules
+.env
