@@ -1,0 +1,19 @@
+{
+  "prediction_id": "e7318cc2-0ef6-4fff-aa59-308894c411e1",
+  "timestamp": "2026-05-01T19:58:01.715611",
+  "image_filename": "e7318cc2-0ef6-4fff-aa59-308894c411e1_ramp(2).jpeg",
+  "image_path": "uploads/images/2026-05-01/e7318cc2-0ef6-4fff-aa59-308894c411e1_ramp(2).jpeg",
+  "features": [
+    {
+      "class": "ramp",
+      "confidence": 0.8008,
+      "bbox": [
+        64,
+        43,
+        295,
+        159
+      ]
+    }
+  ],
+  "objects_detected": 1
+}

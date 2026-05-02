@@ -1,76 +1,76 @@
 #!/usr/bin/env python3
 """
-YOLOv10 Training Script for Stair and Ramp Detection
+YOLOv10 Training Script: Optimized for MacBook Pro M4 (MPS)
 Classes: ramp, stair
 """
 
-from ultralytics import YOLO
 import os
-from pathlib import Path
 import torch
+from pathlib import Path
+from ultralytics import YOLO
 
 def main():
-    # Set paths (relative to script location)
+    # 1. Path Management
     script_dir = Path(__file__).parent
     project_root = script_dir.parent
 
+    # Relative paths - adjust these if your folder names differ
     dataset_path = str(project_root / "dataset" / "data.yaml")
-    models_dir = str(project_root / "models")
     runs_dir = str(project_root / "runs")
 
-    # Create directories if they don't exist
-    os.makedirs(models_dir, exist_ok=True)
     os.makedirs(runs_dir, exist_ok=True)
 
-    # Check device
-    device = 0 if torch.cuda.is_available() else 'cpu'
-    print(f"🖥️  Device: {'GPU' if device == 0 else 'CPU'}")
+    # 2. Hardware Selection (M4 Optimization)
+    if torch.backends.mps.is_available():
+        device = 'mps'
+        print("🚀 Hardware Detected: Apple Silicon (MPS)")
+    elif torch.cuda.is_available():
+        device = 0
+        print("🚀 Hardware Detected: NVIDIA GPU (CUDA)")
+    else:
+        device = 'cpu'
+        print("⚠️  Hardware Detected: CPU (Training will be slow)")
 
-    # Load YOLOv10n model (nano - good balance of speed/accuracy)
-    # Options: yolov10n (nano), yolov10s (small), yolov10m (medium), yolov10l (large), yolov10x (xlarge)
-    print("📦 Loading YOLOv10n pretrained model...")
+    # 3. Model Initialization
+    # Loading YOLOv10n (Nano) for high speed and mobile-readiness
+    print("📦 Loading YOLOv10n pretrained weights...")
     model = YOLO('yolov10n.pt')
 
-    # Train the model
-    print("🚀 Starting training...")
-    print(f"📊 Dataset: {dataset_path}")
-    print(f"📈 Training Configuration:")
-    print(f"   - Epochs: 150")
-    print(f"   - Image Size: 640x640")
-    print(f"   - Batch Size: 16")
-    print(f"   - Device: GPU (if available)")
+    # 4. Starting Training
+    # Batch size of 32-64 is usually the sweet spot for M4 chips
+    print(f"🔥 Training starting at 640x640 on {device}...")
 
     results = model.train(
         data=dataset_path,
-        epochs=150,
-        imgsz=640,
-        device=device,  # Auto-detected GPU or CPU
-        batch=16,
-        patience=25,  # Early stopping patience
+        epochs=150,           # 150 is solid for 11k images
+        imgsz=640,            # Standard for YOLOv10 architecture
+        device=device,
+        batch=32,             # Higher batch size takes advantage of M4's Unified Memory
+        workers=8,            # Uses M4 efficiency cores for data loading
+        patience=25,          # Stop if no improvement for 25 epochs
         save=True,
         project=runs_dir,
-        name='stair_ramp_detection',
+        name='stair_ramp_m4_v1',
         exist_ok=True,
-        verbose=True,
-        plots=True,
-        mosaic=1.0,
+
+        # Hyperparameters for structural recognition
+        mosaic=1.0,           # Helps with small-to-medium object detection
+        mixup=0.1,            # Prevents overfitting on similar textures
         augment=True,
-        hsv_h=0.015,
-        hsv_s=0.7,
-        hsv_v=0.4,
-        degrees=10.0,
-        translate=0.1,
-        scale=0.5,
-        flipud=0.5,
+        flipud=0.5,           # Stairs/Ramps look similar regardless of vertical flip
         fliplr=0.5,
-        perspective=0.0,
-        warmup_epochs=3,
-        warmup_momentum=0.8,
+
+        # Advanced optimizations
+        amp=True,             # Automatic Mixed Precision for speed
+        val=True,             # Validate every epoch
+        plots=True            # Save training charts
     )
 
-    print(f"\n✅ Training complete!")
+    print("\n" + "="*40)
+    print("✅ TRAINING FINISHED")
     print(f"📂 Results saved to: {results.save_dir}")
-    print(f"🏆 Best model: {results.save_dir}/weights/best.pt")
+    print(f"🏆 Best weights: {results.save_dir}/weights/best.pt")
+    print("="*40)
 
 if __name__ == "__main__":
     main()

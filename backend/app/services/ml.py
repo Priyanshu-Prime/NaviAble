@@ -450,6 +450,182 @@ class YoloVisionService:
 
 
 # ---------------------------------------------------------------------------
+# YOLOv10 Vision Service (Optimized for Ramp & Stair Detection)
+# ---------------------------------------------------------------------------
+
+class YoloV10Service:
+    """Specialized YOLOv10 model for ramp and stair accessibility detection.
+
+    This service is optimized for detecting two critical accessibility features:
+    - Ramp: wheelchair-accessible inclined ramps
+    - Stair: staircases or steps (may indicate accessibility barriers)
+
+    Trained on 11,173 images with excellent performance:
+    - mAP@50: 0.837 (83.7% accuracy)
+    - mAP@50-95: 0.611 (multi-scale detection)
+    - Precision: 0.874 (low false positives)
+    - Recall: 0.877 (high object detection)
+
+    The model is optimized for M4 Pro and runs on CPU/MPS/CUDA.
+    """
+
+    _class_map: dict[int, str] = {
+        0: "ramp",
+        1: "stair",
+    }
+
+    def __init__(
+        self,
+        model_path: str | None = None,
+        conf_threshold: float = 0.5,
+    ) -> None:
+        """Initialize the YOLOv10 service.
+
+        Parameters
+        ----------
+        model_path : str, optional
+            Path to the trained YOLOv10 weights file (best.pt).
+            If None, uses YOLO_V10_MODEL environment variable or default.
+        conf_threshold : float
+            Minimum confidence score (0-1) for detections to be included.
+        """
+        from pathlib import Path
+
+        if model_path is None:
+            # Try environment variable first, then default
+            model_path = os.environ.get(
+                "YOLO_V10_MODEL",
+                "../YoloModel11/runs/stair_ramp_m4_v1/weights/best.pt"
+            )
+
+        # Convert to absolute path
+        model_path_obj = Path(model_path)
+        if not model_path_obj.is_absolute():
+            model_path = str((Path.cwd() / model_path_obj).resolve())
+
+        self.model_path = model_path
+        self.conf_threshold = conf_threshold
+        self._model: Any = None
+
+    def initialize(self) -> None:
+        """Load YOLOv10 weights into memory at startup.
+
+        This is called once during application startup via the FastAPI
+        lifespan context manager. The model is loaded on the best available
+        device (MPS for M4, CUDA if available, else CPU).
+        """
+        try:
+            from ultralytics import YOLO
+            import torch
+            from pathlib import Path
+
+            # Resolve the model path
+            model_path = Path(self.model_path)
+            if not model_path.is_absolute():
+                # If relative, resolve from current working directory
+                model_path = Path.cwd() / model_path
+
+            logger.info("Loading YOLOv10 weights from %s ...", model_path)
+
+            # Check if file exists before loading
+            if not model_path.exists():
+                raise FileNotFoundError(f"Model file not found at {model_path}")
+
+            logger.info("Model file exists: %s (size: %.1f MB)", model_path, model_path.stat().st_size / 1e6)
+
+            self._model = YOLO(str(model_path))
+
+            # Detect best device
+            if torch.backends.mps.is_available():
+                device = 'mps'
+                logger.info("YOLOv10 will run on Apple Silicon (MPS)")
+            elif torch.cuda.is_available():
+                device = 0  # First CUDA device
+                logger.info("YOLOv10 will run on NVIDIA GPU (CUDA)")
+            else:
+                device = 'cpu'
+                logger.info("YOLOv10 will run on CPU")
+
+            self._device = device
+            logger.info("✅ YOLOv10 loaded successfully (mAP50: 0.837, mAP50-95: 0.611)")
+
+        except ImportError as exc:
+            logger.error(
+                "ultralytics package not installed. "
+                "YOLOv10 cannot run. Error: %s",
+                exc
+            )
+        except FileNotFoundError as exc:
+            logger.error(
+                "YOLOv10 weights file not found. Error: %s",
+                exc
+            )
+        except Exception as exc:
+            logger.error("Failed to load YOLOv10: %s", exc)
+            import traceback
+            logger.error("Full traceback: %s", traceback.format_exc())
+
+    def predict(self, image_bytes: bytes) -> InferenceResult:
+        """Run YOLOv10 inference on raw image bytes.
+
+        This is a synchronous, blocking method. Call from async context via:
+            await asyncio.to_thread(service.predict, image_bytes)
+
+        Parameters
+        ----------
+        image_bytes : bytes
+            Raw JPEG or PNG image data.
+
+        Returns
+        -------
+        InferenceResult
+            Dictionary with:
+            - objects_detected (int): number of detections above threshold
+            - features (list[dict]): each has 'class', 'confidence', 'bbox'
+        """
+        if self._model is None:
+            if _is_demo_mode():
+                return self._demo_predict(image_bytes)
+            logger.warning("YOLOv10 model not loaded; returning empty result.")
+            return {"objects_detected": 0, "features": []}
+
+        # Convert bytes to image array
+        from PIL import Image
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        img_array = np.array(image)
+
+        # Run inference
+        results = self._model(img_array, conf=self.conf_threshold, iou=0.45)
+
+        # Extract detections
+        features: list[dict[str, Any]] = []
+        for box in results[0].boxes:
+            cls_id = int(box.cls[0].item())
+            conf = float(box.conf[0].item())
+            x1, y1, x2, y2 = [int(v) for v in box.xyxy[0].tolist()]
+            features.append(
+                {
+                    "class": self._class_map.get(cls_id, f"class_{cls_id}"),
+                    "confidence": round(conf, 4),
+                    "bbox": [x1, y1, x2, y2],
+                }
+            )
+
+        return {"objects_detected": len(features), "features": features}
+
+    def _demo_predict(self, image_bytes: bytes) -> InferenceResult:
+        """Return synthetic detections in demo mode."""
+        demo_pool = [
+            {"class": "ramp", "confidence": 0.87, "bbox": [50, 150, 400, 450]},
+            {"class": "stair", "confidence": 0.79, "bbox": [100, 200, 350, 500]},
+        ]
+        num_detections = (len(image_bytes) % 2) + 1
+        features = demo_pool[:num_detections]
+        logger.info("DEMO MODE: returning %d synthetic YOLOv10 detections.", num_detections)
+        return {"objects_detected": len(features), "features": features}
+
+
+# ---------------------------------------------------------------------------
 # RoBERTa NLP Integrity Service
 # ---------------------------------------------------------------------------
 

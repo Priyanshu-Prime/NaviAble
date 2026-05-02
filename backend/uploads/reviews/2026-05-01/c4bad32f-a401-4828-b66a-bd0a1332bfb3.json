@@ -1,0 +1,23 @@
+{
+  "review_id": "c4bad32f-a401-4828-b66a-bd0a1332bfb3",
+  "prediction_id": "f14d09d2-957d-4723-adc3-1c52c3ffed91",
+  "timestamp": "2026-05-01T20:02:46.704273",
+  "location": {
+    "name": "Home",
+    "type": "parking"
+  },
+  "review_text": "Nice stair case with perfect heights\r\n",
+  "accessibility_rating": 2,
+  "detected_features": [
+    {
+      "class": "stair",
+      "confidence": 0.933,
+      "bbox": [
+        67,
+        401,
+        564,
+        577
+      ]
+    }
+  ]
+}

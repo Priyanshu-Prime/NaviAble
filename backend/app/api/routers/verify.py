@@ -112,6 +112,13 @@ async def verify_accessibility(
     yolo: YoloVisionService = request.app.state.yolo_service
     roberta: RobertaNLPService = request.app.state.roberta_service
 
+    # Check if RoBERTa is available
+    if roberta is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RoBERTa NLP service is not available. Please use /api/v1/predict endpoint for YOLOv10 predictions.",
+        )
+
     # ------------------------------------------------------------------
     # Run both models concurrently without blocking the event loop.
     # asyncio.to_thread() dispatches the synchronous (blocking) predict /

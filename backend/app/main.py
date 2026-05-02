@@ -37,11 +37,15 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from app.api.routers.health import router as health_router
+from app.api.routers.predict import router as predict_router
 from app.api.routers.verify import router as verify_router
 from app.core.config import settings
-from app.services.ml import RobertaNLPService, YoloVisionService
+from app.services.ml import RobertaNLPService, YoloV10Service, YoloVisionService
 
 # Load .env file if python-dotenv is available.  This is intentionally
 # best-effort: in production, environment variables should be injected by
@@ -85,15 +89,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yolo_service = YoloVisionService(model_path=settings.yolo_model_path)
     roberta_service = RobertaNLPService(model_dir=settings.roberta_model_dir)
+    yolo_v10_service = YoloV10Service()
 
+    # Initialize YOLOv10 (critical for predict endpoint)
+    yolo_v10_service.initialize()
+    logger.info("YOLOv10 service initialized successfully.")
+
+    # Initialize YOLOv11 (for verify endpoint)
     yolo_service.initialize()
-    roberta_service.initialize()
+    logger.info("YOLOv11 service initialized.")
+
+    # Initialize RoBERTa (optional - graceful degradation)
+    try:
+        roberta_service.initialize()
+        logger.info("RoBERTa service initialized successfully.")
+    except Exception as exc:
+        logger.warning("RoBERTa initialization failed: %s. Continuing without NLP analysis.", exc)
+        roberta_service = None
 
     # Attach singletons to app.state so routers can access them
     app.state.yolo_service = yolo_service
     app.state.roberta_service = roberta_service
+    app.state.yolo_v10_service = yolo_v10_service
 
-    logger.info("ML services initialised. NaviAble backend is ready.")
+    logger.info("✅ NaviAble backend ready - YOLOv10 service active for predictions.")
 
     yield  # ← application runs here
 
@@ -101,8 +120,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("NaviAble backend shutting down. Releasing ML resources …")
     # Explicit deletion triggers Python's reference-counting GC which
     # in turn releases CUDA memory held by PyTorch tensors.
-    del app.state.yolo_service
-    del app.state.roberta_service
+    if hasattr(app.state, 'yolo_service'):
+        del app.state.yolo_service
+    if hasattr(app.state, 'roberta_service') and app.state.roberta_service is not None:
+        del app.state.roberta_service
+    if hasattr(app.state, 'yolo_v10_service'):
+        del app.state.yolo_v10_service
     logger.info("Shutdown complete.")
 
 
@@ -131,3 +154,20 @@ app.add_middleware(
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(health_router)
 app.include_router(verify_router)
+app.include_router(predict_router)
+
+# ── Static Files ──────────────────────────────────────────────────────────────
+# Serve the accessibility checker web interface
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_index():
+    """Serve the main web interface."""
+    static_file = static_dir / "index.html"
+    if static_file.exists():
+        with open(static_file) as f:
+            return f.read()
+    return "<h1>NaviAble Accessibility Checker</h1><p>Use /api/v1/predict for image predictions</p>"

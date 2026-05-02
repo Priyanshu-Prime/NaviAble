@@ -1,0 +1,19 @@
+{
+  "prediction_id": "f14d09d2-957d-4723-adc3-1c52c3ffed91",
+  "timestamp": "2026-05-01T20:02:07.676552",
+  "image_filename": "f14d09d2-957d-4723-adc3-1c52c3ffed91_stairs(1).jpg",
+  "image_path": "uploads/images/2026-05-01/f14d09d2-957d-4723-adc3-1c52c3ffed91_stairs(1).jpg",
+  "features": [
+    {
+      "class": "stair",
+      "confidence": 0.933,
+      "bbox": [
+        67,
+        401,
+        564,
+        577
+      ]
+    }
+  ],
+  "objects_detected": 1
+}
