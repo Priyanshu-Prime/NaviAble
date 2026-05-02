@@ -12,8 +12,6 @@ from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 
-from app.schemas.verify import DetectedFeature
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["Prediction"])

@@ -49,17 +49,15 @@ async def health_check(request: Request) -> dict:
     -------
     dict
         Keys: ``status``, ``version``, ``demo_mode``, ``services``.
-        ``services.yolo`` and ``services.roberta`` are either
-        ``"loaded"`` (real weights in memory) or ``"stub"`` (no weights —
-        demo / test mode).
+        Services are either ``"loaded"`` (real weights in memory) or
+        ``"stub"`` (no weights — demo / test mode).
     """
     from app.core.config import settings
 
-    yolo_svc = getattr(request.app.state, "yolo_service", None)
+    yolo_v10_svc = getattr(request.app.state, "yolo_v10_service", None)
     roberta_svc = getattr(request.app.state, "roberta_service", None)
 
-    yolo_status = "loaded" if (yolo_svc and getattr(yolo_svc, "_model", None)) else "stub"
-    clip_status = "loaded" if (yolo_svc and getattr(yolo_svc, "_clip_model", None)) else "stub"
+    yolo_status = "loaded" if (yolo_v10_svc and getattr(yolo_v10_svc, "_model", None)) else "stub"
     roberta_status = "loaded" if (roberta_svc and getattr(roberta_svc, "_pipeline", None)) else "stub"
 
     return {
@@ -67,8 +65,7 @@ async def health_check(request: Request) -> dict:
         "version": "1.0.0",
         "demo_mode": settings.demo_mode,
         "services": {
-            "yolo": yolo_status,
-            "clip": clip_status,
+            "yolo_v10": yolo_status,
             "roberta": roberta_status,
         },
     }

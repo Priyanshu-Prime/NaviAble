@@ -1,6 +1,0 @@
-path: /Users/vedantsunillande/spot-repo/NaviAble/NaviAble/NaviAble_Dataset
-train: train_best/images
-val: valid/images
-test: test/images
-nc: 3
-names: ['step','stair','ramp']

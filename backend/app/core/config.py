@@ -16,28 +16,18 @@ Environment Variables
 ---------------------
 NAVIABLE_DEMO_MODE : bool (default: false)
     When ``true``, ML services return realistic synthetic results even
-    when model weights are not present.  Use this for live demonstrations
-    and development without GPU hardware.
+    when model weights are not present.
 
-NAVIABLE_CORS_ORIGINS : comma-separated string (default: see below)
-    Allowed CORS origins.  Example:
+NAVIABLE_CORS_ORIGINS : comma-separated string (default: *)
+    Allowed CORS origins. Example:
         NAVIABLE_CORS_ORIGINS=http://localhost:5173,https://naviable.app
-
-YOLO_MODEL_PATH : str (default: ./models/yolov11_naviable.pt)
-    Filesystem path to the trained YOLOv11 ``.pt`` weights file.
 
 ROBERTA_MODEL_DIR : str (default: ./NaviAble_RoBERTa_Final)
     Path to the saved HuggingFace RoBERTa model directory.
 
 ROBERTA_DEVICE : str (default: cpu)
-    Device to load RoBERTa on.  Use ``cuda`` or a device index (``0``)
-    to load on GPU.  Defaults to CPU to avoid VRAM contention with YOLO
-    on limited hardware (GTX 1650 Ti, 4 GB).
-
-ENABLE_HYBRID_CLIP : bool (default: true)
-    When ``true``, the backend vision service attempts to load the CLIP
-    hybrid classifier for accessibility labels.  Set this to ``false`` for
-    a faster lightweight startup that falls back to YOLO-only detection.
+    Device to load RoBERTa on. Use ``cuda`` or a device index (``0``)
+    to load on GPU. Defaults to CPU to avoid VRAM contention.
 """
 
 from __future__ import annotations
@@ -84,13 +74,9 @@ class Settings:
     )
 
     # Model paths (forwarded to services)
-    yolo_model_path: str = os.environ.get(
-        "YOLO_MODEL_PATH", "./models/yolov11_naviable.pt"
-    )
     roberta_model_dir: str = os.environ.get(
         "ROBERTA_MODEL_DIR", "./NaviAble_RoBERTa_Final"
     )
-    enable_hybrid_clip: bool = _bool_env("ENABLE_HYBRID_CLIP", default=True)
 
 
 # Module-level singleton — import this everywhere
