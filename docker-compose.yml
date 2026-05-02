@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: naviable-postgis
+    environment:
+      POSTGRES_USER: naviable
+      POSTGRES_PASSWORD: naviable_dev
+      POSTGRES_DB: naviable
+    ports:
+      - "5432:5432"
+    volumes:
+      - naviable_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U naviable -d naviable"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  naviable_pgdata:

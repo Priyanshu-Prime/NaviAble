@@ -1,83 +1,95 @@
-"""
-Application Settings — NaviAble Backend.
+"""Application settings.
 
-All configuration is driven by environment variables so that the same
-application image can run in demo mode, development, or production
-without code changes.
+Configuration is driven by environment variables (with optional ``.env`` file
+support via pydantic-settings). Tests override settings by clearing the
+``get_settings`` cache and constructing a new ``Settings`` instance with
+explicit kwargs.
 
-Load order
-----------
-1. Defaults defined below.
-2. A ``.env`` file in the working directory (loaded automatically when
-   ``python-dotenv`` is installed).
-3. Real environment variables (highest priority — override everything).
-
-Environment Variables
----------------------
-NAVIABLE_DEMO_MODE : bool (default: false)
-    When ``true``, ML services return realistic synthetic results even
-    when model weights are not present.
-
-NAVIABLE_CORS_ORIGINS : comma-separated string (default: *)
-    Allowed CORS origins. Example:
-        NAVIABLE_CORS_ORIGINS=http://localhost:5173,https://naviable.app
-
-ROBERTA_MODEL_DIR : str (default: ./NaviAble_RoBERTa_Final)
-    Path to the saved HuggingFace RoBERTa model directory.
-
-ROBERTA_DEVICE : str (default: cpu)
-    Device to load RoBERTa on. Use ``cuda`` or a device index (``0``)
-    to load on GPU. Defaults to CPU to avoid VRAM contention.
+The ``vision_weight + nlp_weight`` invariant is enforced at construction
+time so a misconfigured deployment fails to boot rather than silently
+inflating Trust Scores.
 """
 
 from __future__ import annotations
 
-import os
+from functools import lru_cache
 
-# ── Helper ──────────────────────────────────────────────────────────────────
-
-def _bool_env(key: str, default: bool = False) -> bool:
-    """Parse a boolean from an environment variable."""
-    val = os.environ.get(key, str(default)).strip().lower()
-    return val in ("1", "true", "yes", "on")
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def _list_env(key: str, default: list[str]) -> list[str]:
-    """Parse a comma-separated list from an environment variable."""
-    raw = os.environ.get(key, "")
-    if not raw.strip():
-        return default
-    return [item.strip() for item in raw.split(",") if item.strip()]
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+    )
+
+    # ── Database ────────────────────────────────────────────────────────────
+    database_url: str = Field(
+        default="postgresql+psycopg://naviable:naviable_dev@localhost:5432/naviable",
+        description="Async SQLAlchemy URL for Postgres+PostGIS.",
+    )
+
+    # ── ML model paths ──────────────────────────────────────────────────────
+    yolo_weights_path: str = Field(
+        default="YoloModel11/runs/stair_ramp_m4_v1/weights/best.pt",
+        description="Path to fine-tuned YOLOv11 weights.",
+    )
+    roberta_checkpoint_dir: str = Field(
+        default="NaviAble_RoBERTa_Final",
+        description="Path to RoBERTa HuggingFace checkpoint dir.",
+    )
+
+    # ── Late fusion ─────────────────────────────────────────────────────────
+    vision_threshold: float = Field(default=0.205, ge=0.0, le=1.0)
+    vision_weight: float = Field(default=0.60, ge=0.0, le=1.0)
+    nlp_weight: float = Field(default=0.40, ge=0.0, le=1.0)
+
+    # ── Uploads ─────────────────────────────────────────────────────────────
+    upload_dir: str = "backend/uploads"
+    max_image_bytes: int = 10 * 1024 * 1024
+    allowed_image_types: tuple[str, ...] = (
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+    )
+    public_base_url: str = "http://localhost:8000"
+    static_prefix: str = "/static/"
+
+    # ── App ─────────────────────────────────────────────────────────────────
+    demo_mode: bool = Field(default=False, alias="naviable_demo_mode")
+    cors_origins: list[str] = Field(
+        default_factory=lambda: ["*"],
+        alias="naviable_cors_origins",
+    )
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_csv(cls, v):
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
+
+    @model_validator(mode="after")
+    def _weights_sum_to_one(self) -> "Settings":
+        total = self.vision_weight + self.nlp_weight
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError(
+                f"vision_weight + nlp_weight must equal 1.0, got {total}"
+            )
+        return self
 
 
-# ── Settings ─────────────────────────────────────────────────────────────────
+@lru_cache
+def get_settings() -> Settings:
+    """Return a cached Settings instance.
 
-class Settings:
-    """Flat settings container populated from environment variables.
-
-    Using a plain class (rather than Pydantic BaseSettings) keeps this
-    module import-lightweight so it can be used in test environments
-    that do not have the full dependency stack.
+    Tests can clear the cache via ``get_settings.cache_clear()``.
     """
-
-    # Demo / development mode
-    demo_mode: bool = _bool_env("NAVIABLE_DEMO_MODE", default=False)
-
-    # CORS — allowed origins for the browser frontend.
-    # Flutter Web `flutter run -d chrome` uses a randomly assigned port, so we
-    # allow all localhost ports in development.  Override via env var in prod.
-    cors_origins: list[str] = _list_env(
-        "NAVIABLE_CORS_ORIGINS",
-        default=[
-            "*"
-        ],
-    )
-
-    # Model paths (forwarded to services)
-    roberta_model_dir: str = os.environ.get(
-        "ROBERTA_MODEL_DIR", "./NaviAble_RoBERTa_Final"
-    )
+    return Settings()
 
 
-# Module-level singleton — import this everywhere
-settings = Settings()
+# Backwards-compatible module-level singleton for legacy imports.
+settings = get_settings()
