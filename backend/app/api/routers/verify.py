@@ -82,7 +82,7 @@ async def verify(
         place_id=place.id,
         location=f"SRID=4326;POINT({eff_lon} {eff_lat})",
         image_path=str(saved_path),
-        image_phash=vision_result.image_phash,
+        image_phash=str(vision_result.image_phash),
         text_note=payload.review,
         rating=payload.rating,
         vision_score=vision_result.score,

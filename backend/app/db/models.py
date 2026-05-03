@@ -117,7 +117,7 @@ class Contribution(Base):
     )
     image_path: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    image_phash: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    image_phash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     text_note: Mapped[str] = mapped_column(Text, nullable=False)
     rating: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     vision_score: Mapped[float] = mapped_column(Float, nullable=False)
