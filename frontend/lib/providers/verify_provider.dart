@@ -12,7 +12,6 @@ library providers;
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:uuid/uuid.dart';
 
 import '../api/api_client.dart';
 import '../models/verification_models.dart';
@@ -88,18 +87,18 @@ class VerifyNotifier extends Notifier<VerifyState> {
   /// 1. Compresses the raw [imageBytes] to JPEG at 85 % quality to reduce
   ///    file size before upload.  This is critical to prevent CUDA OOM on
   ///    the target GTX 1650 Ti (4 GB VRAM).
-  /// 2. Generates a random location UUID (demo context — real app would pass
-  ///    the location ID from a location selection screen).
-  /// 3. Calls the API and transitions state accordingly.
+  /// 2. Calls the API and transitions state accordingly.
   ///
   /// Parameters:
   /// - [imageBytes]: Raw image bytes from [ImagePicker].
   /// - [imageFilename]: Original filename for the multipart field.
-  /// - [textReview]: The user's written review text.
+  /// - [review]: The user's written review text.
+  /// - [rating]: The user's accessibility rating (1-5 stars).
   Future<void> submit({
     required List<int> imageBytes,
     required String imageFilename,
-    required String textReview,
+    required String review,
+    required int rating,
   }) async {
     state = const VerifyLoading();
 
@@ -116,16 +115,13 @@ class VerifyNotifier extends Notifier<VerifyState> {
         format: CompressFormat.jpeg,
       );
 
-      // ── Step 2: Generate location UUID ────────────────────────────────
-      final locationId = const Uuid().v4();
-
-      // ── Step 3: Call API ──────────────────────────────────────────────
+      // ── Step 2: Call API ──────────────────────────────────────────────
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.verify(
         imageBytes: compressed,
         imageFilename: imageFilename,
-        textReview: textReview,
-        locationId: locationId,
+        review: review,
+        rating: rating,
       );
 
       state = VerifySuccess(response);

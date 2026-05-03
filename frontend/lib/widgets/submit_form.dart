@@ -22,6 +22,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../providers/verify_provider.dart';
 import '../theme/app_theme.dart';
+import './star_rating.dart';
 
 /// The primary submission form for NaviAble.
 ///
@@ -43,6 +44,7 @@ class _SubmitFormState extends ConsumerState<SubmitForm> {
   /// are transient UI state that does not need to live in a Riverpod provider.
   Uint8List? _imageBytes;
   String _imageFilename = '';
+  int? _rating;
 
   final _imagePicker = ImagePicker();
 
@@ -96,11 +98,21 @@ class _SubmitFormState extends ConsumerState<SubmitForm> {
       );
       return;
     }
+    if (_rating == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a rating (1-5 stars).'),
+          backgroundColor: NaviAbleColors.warning,
+        ),
+      );
+      return;
+    }
 
     await ref.read(verifyProvider.notifier).submit(
           imageBytes: _imageBytes!.toList(),
           imageFilename: _imageFilename.isEmpty ? 'photo.jpg' : _imageFilename,
-          textReview: _reviewController.text.trim(),
+          review: _reviewController.text.trim(),
+          rating: _rating!,
         );
   }
 
@@ -218,6 +230,30 @@ class _SubmitFormState extends ConsumerState<SubmitForm> {
                 }
                 return null;
               },
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // ── Star rating ─────────────────────────────────────────────────
+          Semantics(
+            label: 'Rate the location accessibility',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'How would you rate the accessibility?',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: NaviAbleColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                StarRating(
+                  value: _rating,
+                  onChanged: (rating) => setState(() => _rating = rating),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
