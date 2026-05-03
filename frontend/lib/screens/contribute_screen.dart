@@ -515,6 +515,14 @@ class _ResultCard extends ConsumerWidget {
               ),
             ],
           ),
+          if (response.placeId != null) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.map_outlined),
+              label: const Text('Back to map'),
+            ),
+          ],
         ],
       ),
     );
