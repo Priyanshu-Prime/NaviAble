@@ -28,17 +28,17 @@ class Settings(BaseSettings):
 
     # ── Database ────────────────────────────────────────────────────────────
     database_url: str = Field(
-        default="postgresql+psycopg://naviable:naviable_dev@localhost:5432/naviable",
+        default="postgresql+psycopg://naviable:naviable_dev@localhost:5434/naviable",
         description="Async SQLAlchemy URL for Postgres+PostGIS.",
     )
 
     # ── ML model paths ──────────────────────────────────────────────────────
     yolo_weights_path: str = Field(
-        default="YoloModel11/runs/stair_ramp_m4_v1/weights/best.pt",
+        default="../YoloModel11/runs/stair_ramp_m4_v1/weights/best.pt",
         description="Path to fine-tuned YOLOv11 weights.",
     )
     roberta_checkpoint_dir: str = Field(
-        default="NaviAble_RoBERTa_Final",
+        default="../NaviAble_RoBERTa_Final",
         description="Path to RoBERTa HuggingFace checkpoint dir.",
     )
 

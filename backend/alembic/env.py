@@ -21,9 +21,8 @@ if config.config_file_name is not None:
 
 # Override sqlalchemy.url with whatever the app settings resolved.
 _settings = get_settings()
-# Alembic uses the sync driver — strip the +psycopg async marker to
-# stay compatible with both psycopg and psycopg2.
-_sync_url = _settings.database_url.replace("+psycopg", "")
+# Alembic uses the sync driver — keep the psycopg driver (v3)
+_sync_url = _settings.database_url
 config.set_main_option("sqlalchemy.url", _sync_url)
 
 target_metadata = Base.metadata

@@ -1,141 +1,93 @@
 /// Data models for the NaviAble Verification API response.
 ///
-/// These classes mirror the JSON contract defined in
-/// `.agent/architecture/API_CONTRACTS.md`.  Every field uses the same names
-/// as the JSON keys so that `fromJson` factories are simple and readable.
+/// These classes mirror the JSON contract from the FastAPI backend.
+/// Every field uses the same names as the JSON keys so that `fromJson` factories
+/// are simple and readable.
 library models;
 
 /// A single accessibility feature detected by the YOLO vision model.
 ///
-/// Bounding box ([bbox]) uses pixel coordinates from the original image:
+/// Bounding box uses normalized coordinates [0.0, 1.0]:
 /// `[x1, y1, x2, y2]` where `(x1, y1)` is the top-left corner.
 class DetectedFeature {
-  /// Human-readable class label (e.g. `'ramp'`, `'handrail'`).
-  final String className;
-
   /// Detection confidence in the range [0.0, 1.0].
   final double confidence;
 
-  /// Bounding box as `[x1, y1, x2, y2]` pixel coordinates.
-  final List<int> bbox;
+  /// Normalized bounding box as `[x1, y1, x2, y2]` in range [0.0, 1.0].
+  final List<double> bbox;
 
   const DetectedFeature({
-    required this.className,
     required this.confidence,
     required this.bbox,
   });
 
   factory DetectedFeature.fromJson(Map<String, dynamic> json) {
     return DetectedFeature(
-      className: json['class'] as String,
       confidence: (json['confidence'] as num).toDouble(),
-      bbox: (json['bbox'] as List).map((v) => (v as num).toInt()).toList(),
-    );
-  }
-}
-
-/// Aggregated output from the YOLOv11 vision inference pipeline.
-class VisionAnalysis {
-  /// Total number of accessibility features detected above the 50% threshold.
-  final int objectsDetected;
-
-  /// Individual detection results with class label, confidence, and bounding box.
-  final List<DetectedFeature> features;
-
-  const VisionAnalysis({
-    required this.objectsDetected,
-    required this.features,
-  });
-
-  factory VisionAnalysis.fromJson(Map<String, dynamic> json) {
-    return VisionAnalysis(
-      objectsDetected: json['objects_detected'] as int,
-      features: (json['features'] as List)
-          .map((f) => DetectedFeature.fromJson(f as Map<String, dynamic>))
+      bbox: (json['bbox'] as List)
+          .map((v) => (v as num).toDouble())
           .toList(),
     );
   }
 }
 
-/// Output from the RoBERTa NLP Integrity Engine.
+/// Top-level API response for `POST /api/v1/verify`.
 ///
-/// The model was fine-tuned on a 402-row balanced dataset built via LLM
-/// Knowledge Distillation to distinguish genuine physical descriptions
-/// from generic accessibility-washed praise.
-class NlpAnalysis {
-  /// `true` when the review contains genuine physical accessibility details
-  /// and the model confidence exceeds the 75% threshold.
-  final bool isGenuine;
-
-  /// Model probability that the review is genuine (Class-1 confidence).
-  final double confidence;
-
-  /// Human-readable label: `'Genuine Physical Detail'` or
-  /// `'Generic / Non-specific praise'`.
-  final String label;
-
-  const NlpAnalysis({
-    required this.isGenuine,
-    required this.confidence,
-    required this.label,
-  });
-
-  factory NlpAnalysis.fromJson(Map<String, dynamic> json) {
-    return NlpAnalysis(
-      isGenuine: json['is_genuine'] as bool,
-      confidence: (json['confidence'] as num).toDouble(),
-      label: json['label'] as String,
-    );
-  }
-}
-
-/// Combined Dual-AI verification result for a single review submission.
-class VerificationData {
-  /// NLP classifier output.
-  final NlpAnalysis nlpAnalysis;
-
-  /// YOLO vision detector output.
-  final VisionAnalysis visionAnalysis;
-
-  /// Composite trust score: `0.60 × vision_confidence + 0.40 × nlp_confidence`.
-  /// Capped at `0.50` when no visual features are detected (as per system design).
-  final double naviableTrustScore;
-
-  const VerificationData({
-    required this.nlpAnalysis,
-    required this.visionAnalysis,
-    required this.naviableTrustScore,
-  });
-
-  factory VerificationData.fromJson(Map<String, dynamic> json) {
-    return VerificationData(
-      nlpAnalysis: NlpAnalysis.fromJson(
-          json['nlp_analysis'] as Map<String, dynamic>),
-      visionAnalysis: VisionAnalysis.fromJson(
-          json['vision_analysis'] as Map<String, dynamic>),
-      naviableTrustScore:
-          (json['naviable_trust_score'] as num).toDouble(),
-    );
-  }
-}
-
-/// Top-level API response envelope for `POST /api/v1/verify`.
+/// This is the actual response from the backend after processing an image
+/// and text review through the Dual-AI pipeline (vision + NLP).
 class VerificationResponse {
-  /// `'success'` on a valid inference run.
-  final String status;
+  /// Unique identifier for this contribution.
+  final String id;
 
-  /// The verification results.
-  final VerificationData data;
+  /// Composite trust score: 0.60 × vision_score + 0.40 × nlp_score.
+  /// Range: [0.0, 1.0]
+  final double trustScore;
+
+  /// YOLO vision model confidence (0.0 to 1.0).
+  /// How confident the vision model is in detecting accessibility features.
+  final double visionScore;
+
+  /// RoBERTa NLP model confidence (0.0 to 1.0).
+  /// How confident the NLP model is in the review authenticity.
+  final double nlpScore;
+
+  /// Visibility status: PUBLIC, CAVEAT, or HIDDEN.
+  /// Based on trust score thresholds.
+  final String visibilityStatus;
+
+  /// Map of feature type to list of detections.
+  /// Example: {'ramp': [DetectedFeature(...), ...], 'stairs': [...]}
+  final Map<String, List<DetectedFeature>> detectedFeatures;
 
   const VerificationResponse({
-    required this.status,
-    required this.data,
+    required this.id,
+    required this.trustScore,
+    required this.visionScore,
+    required this.nlpScore,
+    required this.visibilityStatus,
+    required this.detectedFeatures,
   });
 
   factory VerificationResponse.fromJson(Map<String, dynamic> json) {
+    final detectedFeaturesJson =
+        json['detected_features'] as Map<String, dynamic>? ?? {};
+
+    final detectedFeatures = <String, List<DetectedFeature>>{};
+    detectedFeaturesJson.forEach((key, value) {
+      if (value is List) {
+        detectedFeatures[key] = value
+            .map((f) => DetectedFeature.fromJson(f as Map<String, dynamic>))
+            .toList();
+      }
+    });
+
     return VerificationResponse(
-      status: json['status'] as String,
-      data: VerificationData.fromJson(json['data'] as Map<String, dynamic>),
+      id: json['id'] as String,
+      trustScore: (json['trust_score'] as num).toDouble(),
+      visionScore: (json['vision_score'] as num).toDouble(),
+      nlpScore: (json['nlp_score'] as num).toDouble(),
+      visibilityStatus: json['visibility_status'] as String,
+      detectedFeatures: detectedFeatures,
     );
   }
 }

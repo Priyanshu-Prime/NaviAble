@@ -24,8 +24,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/verification_models.dart';
 import '../providers/verify_provider.dart';
 import '../theme/app_theme.dart';
-import '../widgets/detection_result_card.dart';
-import '../widgets/nlp_result_card.dart';
 import '../widgets/submit_form.dart';
 import '../widgets/trust_score_gauge.dart';
 
@@ -353,8 +351,6 @@ class _SuccessPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final data = response.data;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -380,15 +376,15 @@ class _SuccessPanel extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                TrustScoreGauge(score: data.naviableTrustScore),
+                TrustScoreGauge(score: response.trustScore),
               ],
             ),
           ),
         ),
         const SizedBox(height: 16),
-        NlpResultCard(nlpAnalysis: data.nlpAnalysis),
+        _NlpScoreCard(nlpScore: response.nlpScore),
         const SizedBox(height: 16),
-        DetectionResultCard(visionAnalysis: data.visionAnalysis),
+        _VisionScoreCard(visionScore: response.visionScore, detectedFeatures: response.detectedFeatures),
         const SizedBox(height: 16),
         Semantics(
           label: 'Verify another location button',
@@ -400,6 +396,150 @@ class _SuccessPanel extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── NLP Score Card ─────────────────────────────────────────────────────────────
+
+class _NlpScoreCard extends StatelessWidget {
+  final double nlpScore;
+
+  const _NlpScoreCard({required this.nlpScore});
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = (nlpScore * 100).round();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Text Analysis (NLP)',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: nlpScore,
+                      minHeight: 8,
+                      backgroundColor: Colors.grey[300],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        nlpScore > 0.7
+                            ? NaviAbleColors.accent
+                            : nlpScore > 0.4
+                                ? NaviAbleColors.warning
+                                : NaviAbleColors.danger,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '$percent%',
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Review authenticity confidence: $percent%',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Vision Score Card ──────────────────────────────────────────────────────────
+
+class _VisionScoreCard extends StatelessWidget {
+  final double visionScore;
+  final Map<String, List<DetectedFeature>> detectedFeatures;
+
+  const _VisionScoreCard({
+    required this.visionScore,
+    required this.detectedFeatures,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = (visionScore * 100).round();
+    final featureCount = detectedFeatures.values.fold<int>(
+      0,
+      (sum, features) => sum + features.length,
+    );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Image Analysis (Vision)',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: visionScore,
+                      minHeight: 8,
+                      backgroundColor: Colors.grey[300],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        visionScore > 0.7
+                            ? NaviAbleColors.accent
+                            : visionScore > 0.4
+                                ? NaviAbleColors.warning
+                                : NaviAbleColors.danger,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '$percent%',
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Features detected: $featureCount',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            if (detectedFeatures.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                children: detectedFeatures.keys.map((feature) {
+                  return Chip(
+                    label: Text(
+                      feature,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    backgroundColor: NaviAbleColors.primary.withOpacity(0.2),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

@@ -121,9 +121,17 @@ class NaviAbleApiClient {
     required String textReview,
     required String locationId,
   }) async {
+    // Demo mode: use default location (San Francisco, CA)
+    // In production, these would come from the location picker UI
+    const double defaultLatitude = 37.7749;
+    const double defaultLongitude = -122.4194;
+    const int defaultRating = 3;
+
     final formData = FormData.fromMap({
-      'text_review': textReview,
-      'location_id': locationId,
+      'review': textReview,
+      'latitude': defaultLatitude,
+      'longitude': defaultLongitude,
+      'rating': defaultRating,
       'image': MultipartFile.fromBytes(
         imageBytes,
         filename: imageFilename,

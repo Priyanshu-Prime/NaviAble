@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import Protocol
+from typing import Optional, Protocol
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class NlpUnavailable(RuntimeError):
 
 
 class RobertaNlpService:
-    def __init__(self, checkpoint_dir: Path, *, device: str | None = None):
+    def __init__(self, checkpoint_dir: Path, *, device: Optional[str] = None):
         import torch
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 

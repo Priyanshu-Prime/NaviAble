@@ -1,6 +1,6 @@
 """Pydantic v2 schemas for the contribution API."""
 from __future__ import annotations
-from typing import Annotated, Literal
+from typing import Annotated, Dict, List, Literal, Optional, Tuple
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 class FeatureDetection(BaseModel):
     confidence: float
-    bbox: tuple[float, float, float, float]  # x1, y1, x2, y2 normalised
+    bbox: Tuple[float, float, float, float]  # x1, y1, x2, y2 normalised
 
 
 class ContributionCreate(BaseModel):
@@ -25,7 +25,7 @@ class ContributionResponse(BaseModel):
     vision_score: float
     nlp_score: float
     visibility_status: Literal["PUBLIC", "CAVEAT", "HIDDEN"]
-    detected_features: dict[str, list[FeatureDetection]]
+    detected_features: Dict[str, List[FeatureDetection]]
 
 
 class ContributionPin(BaseModel):
@@ -37,8 +37,8 @@ class ContributionPin(BaseModel):
     visibility_status: Literal["PUBLIC", "CAVEAT"]
     rating: int
     text_note: str
-    image_url: str | None
+    image_url: Optional[str]
 
 
 class NearbyResponse(BaseModel):
-    items: list[ContributionPin]
+    items: List[ContributionPin]

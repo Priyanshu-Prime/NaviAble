@@ -5,7 +5,7 @@ import asyncio
 import logging
 from collections import deque
 from pathlib import Path
-from typing import Protocol
+from typing import Dict, List, Protocol
 
 import imagehash
 from PIL import Image, UnidentifiedImageError
@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 class VisionResult(BaseModel):
     score: float
-    detections: dict[str, list[FeatureDetection]]
+    detections: Dict[str, List[FeatureDetection]]
     image_phash: int
 
 
@@ -48,8 +48,8 @@ class YoloVisionService:
 
         self._model = YOLO(str(weights_path))
         self._threshold = threshold
-        self._cache: dict[int, VisionResult] = {}
-        self._cache_order: deque[int] = deque(maxlen=cache_size)
+        self._cache: Dict[int, VisionResult] = {}
+        self._cache_order: deque = deque(maxlen=cache_size)
         self._lock = asyncio.Lock()
 
     async def score(self, image_path: Path) -> VisionResult:
@@ -86,7 +86,7 @@ class YoloVisionService:
 
         results = self._model.predict(str(image_path), verbose=False, conf=self._threshold)
 
-        detections: dict[str, list[FeatureDetection]] = {}
+        detections: Dict[str, List[FeatureDetection]] = {}
         if results:
             for box in results[0].boxes:
                 cls_name = self._model.names[int(box.cls[0])].lower()
@@ -112,7 +112,7 @@ class YoloVisionService:
             image_phash=phash,
         )
 
-    def _aggregate_score(self, detections: dict[str, list[FeatureDetection]]) -> float:
+    def _aggregate_score(self, detections: Dict[str, List[FeatureDetection]]) -> float:
         confidences = [d.confidence for boxes in detections.values() for d in boxes]
         return max(confidences, default=0.0)
 

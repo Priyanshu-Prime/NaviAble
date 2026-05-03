@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +19,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["discovery"])
 
 
-def _compose_image_url(image_path: str, settings: Settings) -> str | None:
+def _compose_image_url(image_path: str, settings: Settings) -> Optional[str]:
     if not image_path:
         return None
     filename = Path(image_path).name
