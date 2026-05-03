@@ -9,7 +9,7 @@ PID_FILE="$ROOT_DIR/.naviable.pids"
 
 BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
-FLUTTER_DEVICE="${FLUTTER_DEVICE:-macos}"
+FLUTTER_DEVICE="${FLUTTER_DEVICE:-chrome}"
 FLUTTER_WEB_HOST="${FLUTTER_WEB_HOST:-127.0.0.1}"
 FLUTTER_WEB_PORT="${FLUTTER_WEB_PORT:-5173}"
 NAVIABLE_DEMO_MODE="${NAVIABLE_DEMO_MODE:-false}"
@@ -29,10 +29,10 @@ Usage: ./run.sh [OPTIONS]
 
 Starts entire NaviAble project with one command: database + backend + frontend app.
 
-Default behavior: Starts macOS desktop app with real YOLO weights.
+Default behavior: Starts web app (Chrome) with real YOLO weights.
 
 Optional environment variables:
-  FLUTTER_DEVICE     (default: macos) - Use 'chrome' for web, 'android', 'ios', or device ID
+  FLUTTER_DEVICE     (default: chrome) - Use 'macos', 'android', 'ios', or device ID
   BACKEND_HOST       (default: 127.0.0.1)
   BACKEND_PORT       (default: 8000)
   API_BASE_URL       (default: http://BACKEND_HOST:BACKEND_PORT)
@@ -48,8 +48,8 @@ Flags:
   -d, --docker-only  Start only Docker database
 
 Examples:
-  ./run.sh                                    # macOS desktop app
-  FLUTTER_DEVICE=chrome ./run.sh              # Web browser
+  ./run.sh                                    # Web browser (Chrome)
+  FLUTTER_DEVICE=macos ./run.sh               # macOS desktop app
   FLUTTER_DEVICE=android ./run.sh             # Android emulator
   ./run.sh -b                                 # Backend only (for testing)
 
