@@ -52,3 +52,6 @@ merge_data.csv
 
 YoloModel11/dataset
 backend/uploads
+
+# ──── Git Worktrees ────
+.worktrees/
