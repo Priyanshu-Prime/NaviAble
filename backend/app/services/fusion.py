@@ -18,6 +18,6 @@ def assign_status(trust_score: float) -> Literal["PUBLIC", "CAVEAT", "HIDDEN"]:
     """Map trust score to visibility bucket."""
     if trust_score >= 0.70:
         return "PUBLIC"
-    if trust_score >= 0.40:
+    if trust_score >= 0.20:
         return "CAVEAT"
     return "HIDDEN"

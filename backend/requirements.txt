@@ -29,7 +29,7 @@ numpy>=1.24.0
 # ──── Database ────
 sqlalchemy[asyncio]>=2.0
 psycopg[binary]>=3.1
-geoalchemy2>=0.14
+geoalchemy2[shapely]>=0.14
 alembic>=1.13
 
 # ──── Settings ────
