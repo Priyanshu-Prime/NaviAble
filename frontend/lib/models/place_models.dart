@@ -74,7 +74,7 @@ class ContributionPin {
 
   ContributionPin({
     required this.id,
-    required this.placeId,
+    this.placeId,
     required this.latitude,
     required this.longitude,
     required this.trustScore,

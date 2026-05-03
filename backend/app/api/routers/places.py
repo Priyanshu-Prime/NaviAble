@@ -201,6 +201,7 @@ async def detail(
         pt = to_shape(c.location)
         return ContributionPin(
             id=c.id,
+            place_id=c.place_id,
             latitude=round(pt.y, 7),
             longitude=round(pt.x, 7),
             trust_score=c.trust_score,

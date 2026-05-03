@@ -42,6 +42,6 @@ final searchProvider = FutureProvider.family<List<PlaceAutocomplete>, String>(
   (ref, query) async {
     if (query.trim().length < 2) return [];
     final api = ref.watch(apiClientProvider);
-    return api.searchPlaces(query: query);
+    return api.searchPlaces(query);
   },
 );
