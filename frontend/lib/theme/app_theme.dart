@@ -47,10 +47,10 @@ abstract final class NaviAbleColors {
 
 /// The centralised theme definition for NaviAble.
 abstract final class NaviAbleTheme {
-  /// Light theme — the only theme currently supported.
+  /// Light theme — default theme for bright environments.
   ///
-  /// Designed for high readability on laptop / desktop screens where the
-  /// demonstration is expected to run (`flutter run -d chrome`).
+  /// Designed for high readability on laptop / desktop screens and mobile
+  /// devices in bright light conditions.
   static ThemeData get light {
     const colorScheme = ColorScheme.light(
       primary: NaviAbleColors.primary,
@@ -146,6 +146,113 @@ abstract final class NaviAbleTheme {
         backgroundColor: const Color(0xFFE3F2FD),
         labelStyle: const TextStyle(
           color: Color(0xFF0D47A1),
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      ),
+    );
+  }
+
+  /// Dark theme — for low-light environments.
+  static ThemeData get dark {
+    const colorScheme = ColorScheme.dark(
+      primary: NaviAbleColors.primary,
+      onPrimary: Colors.white,
+      secondary: NaviAbleColors.accent,
+      onSecondary: Color(0xFF1A202C),
+      error: NaviAbleColors.danger,
+      surface: Color(0xFF1F2937),
+      onSurface: Color(0xFFF3F4F6),
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: const Color(0xFF111827),
+      fontFamily: 'Roboto',
+      brightness: Brightness.dark,
+
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF1F2937),
+        foregroundColor: Color(0xFFF3F4F6),
+        elevation: 2,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          color: Color(0xFFF3F4F6),
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.3,
+        ),
+      ),
+
+      cardTheme: CardThemeData(
+        color: const Color(0xFF1F2937),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF374151), width: 1),
+        ),
+        margin: const EdgeInsets.all(0),
+      ),
+
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: NaviAbleColors.primary,
+          foregroundColor: Colors.white,
+          minimumSize: const Size.fromHeight(48),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: NaviAbleColors.primary,
+          minimumSize: const Size.fromHeight(48),
+          side: const BorderSide(color: NaviAbleColors.primary, width: 1.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      ),
+
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF374151),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF4B5563)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF4B5563), width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: NaviAbleColors.primary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: NaviAbleColors.danger, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        labelStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+      ),
+
+      chipTheme: ChipThemeData(
+        backgroundColor: const Color(0xFF1E3A8A),
+        labelStyle: const TextStyle(
+          color: Color(0xFF93C5FD),
           fontWeight: FontWeight.w600,
           fontSize: 12,
         ),

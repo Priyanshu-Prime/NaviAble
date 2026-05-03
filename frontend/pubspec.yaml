@@ -44,10 +44,47 @@ dependencies:
   # ── UI / Icons ────────────────────────────────────────────────────────
   cupertino_icons: ^1.0.8
 
+  # ── Routing ────────────────────────────────────────────────────────────
+  # go_router: Declarative routing with path parameters, query strings, and
+  # nested navigation. Replaces imperative Navigator for better testability.
+  go_router: ^14.2.0
+
+  # ── Maps + Geolocation ────────────────────────────────────────────────
+  # google_maps_flutter: Embed Google Maps, markers, polylines.
+  # geolocator: Cross-platform location access with permissions handling.
+  # geocoding: Forward/reverse geocoding using platform-native services.
+  # flutter_polyline_points: Decode encoded polyline from Directions API.
+  # google_maps_flutter_platform_interface: Platform interface for custom impls.
+  google_maps_flutter: ^2.7.0
+  geolocator: ^12.0.0
+  geocoding: ^3.0.0
+  flutter_polyline_points: ^2.1.0
+  google_maps_flutter_platform_interface: ^2.7.0
+
+  # ── Image Metadata ────────────────────────────────────────────────────
+  # native_exif: Read EXIF GPS on-device for early location validation.
+  # cached_network_image: Cache downloaded images (e.g., contribution photos).
+  native_exif: ^0.6.2
+  cached_network_image: ^3.3.1
+
+  # ── Utilities ──────────────────────────────────────────────────────────
+  # collection: Higher-order functions (groupBy, minBy, etc.).
+  # intl: Localized date/number formatting.
+  # riverpod_annotation: Codegen for Riverpod providers (with build_runner).
+  collection: ^1.18.0
+  intl: ^0.19.0
+  riverpod_annotation: ^2.3.5
+
+  # ── Permissions ────────────────────────────────────────────────────────
+  # permission_handler: Request runtime permissions (camera, location, etc).
+  permission_handler: ^11.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  build_runner: ^2.4.11
+  riverpod_generator: ^2.4.0
 
 flutter:
   uses-material-design: true

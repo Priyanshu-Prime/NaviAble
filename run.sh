@@ -14,6 +14,7 @@ FLUTTER_WEB_HOST="${FLUTTER_WEB_HOST:-127.0.0.1}"
 FLUTTER_WEB_PORT="${FLUTTER_WEB_PORT:-5173}"
 NAVIABLE_DEMO_MODE="${NAVIABLE_DEMO_MODE:-false}"
 ENABLE_HYBRID_CLIP="${ENABLE_HYBRID_CLIP:-false}"
+# Default API URL varies by device: android uses 10.0.2.2, others use localhost
 API_BASE_URL="${API_BASE_URL:-http://${BACKEND_HOST}:${BACKEND_PORT}}"
 SKIP_PIP_INSTALL="${SKIP_PIP_INSTALL:-false}"
 YOLO_V10_MODEL="${YOLO_V10_MODEL:-./YoloModel11/runs/stair_ramp_m4_v1/weights/best.pt}"
@@ -232,10 +233,14 @@ else
     echo ""
     echo "Choose a device (or press Ctrl+C to exit):"
     echo "  1) chrome (Web browser - recommended)"
+    echo "  2) android-emulator (Android Emulator)"
+    echo "  3) ios-simulator (iOS Simulator)"
     echo ""
     read -p "Enter choice (default: 1): " device_choice
     case "$device_choice" in
       1|"") FLUTTER_DEVICE="chrome" ;;
+      2) FLUTTER_DEVICE="android-emulator" ;;
+      3) FLUTTER_DEVICE="ios-simulator" ;;
       *)
         read -p "Enter device ID: " FLUTTER_DEVICE
         if [[ -z "$FLUTTER_DEVICE" ]]; then

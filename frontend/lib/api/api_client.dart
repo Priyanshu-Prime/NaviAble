@@ -1,48 +1,40 @@
 /// NaviAble API Client
 ///
 /// Encapsulates all HTTP communication with the FastAPI backend using the
-/// [dio] package.  Using `dio` (over the built-in `http` package) was chosen
-/// because it provides:
-///
+/// [dio] package. Using `dio` (over the built-in `http` package) provides:
 /// - [Interceptor] support for request logging and JWT token injection.
-/// - Built-in `FormData` / `MultipartFile` support for the image upload.
+/// - Built-in `FormData` / `MultipartFile` support for image uploads.
 /// - Structured error handling via [DioException].
-///
-/// The base URL is controlled by the compile-time constant `apiBaseUrl`
-/// (set via `--dart-define=API_BASE_URL=http://localhost:8000`) so that the
-/// same build artefact can target different environments without recompilation.
 library api_client;
 
 import 'package:dio/dio.dart';
 
+import '../models/place_models.dart';
 import '../models/verification_models.dart';
 
 /// Compile-time configurable backend URL.
 ///
 /// Override at build time with:
 /// ```
-/// flutter run --dart-define=API_BASE_URL=http://your-server:8000
+/// flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
+/// flutter run --dart-define=API_BASE_URL=http://192.168.x.y:8000
 /// ```
-/// or in `launch.json`:
-/// ```json
-/// { "args": ["--dart-define=API_BASE_URL=http://your-server:8000"] }
-/// ```
-const String _kApiBaseUrl =
-    String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8000');
+const String kApiBaseUrl =
+    String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:8000');
 
 /// Central API client for the NaviAble backend.
 ///
-/// This class is a singleton provided via Riverpod in
-/// `lib/providers/api_provider.dart`.  It must NOT be instantiated directly
-/// in UI code — always consume it through the [apiClientProvider].
+/// This class is a singleton provided via Riverpod in `lib/api/providers.dart`.
+/// It must NOT be instantiated directly in UI code — always consume it through
+/// the [apiClientProvider].
 class NaviAbleApiClient {
   late final Dio _dio;
 
   NaviAbleApiClient() {
     _dio = Dio(
       BaseOptions(
-        baseUrl: _kApiBaseUrl,
-        connectTimeout: const Duration(seconds: 30),
+        baseUrl: kApiBaseUrl,
+        connectTimeout: const Duration(seconds: 20),
         receiveTimeout: const Duration(seconds: 60),
         sendTimeout: const Duration(seconds: 60),
         headers: {'Accept': 'application/json'},
@@ -50,8 +42,6 @@ class NaviAbleApiClient {
     );
 
     // ── Request / Response Logging Interceptor ───────────────────────────
-    // Logs method, path, and response time for every request.
-    // Critical for benchmarking ML inference latency during demonstrations.
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
@@ -84,66 +74,110 @@ class NaviAbleApiClient {
     );
   }
 
-  /// Check whether the backend is reachable and return its health status.
-  ///
-  /// Called by the [HomeScreen] on first load to detect demo mode and show
-  /// an informational banner to the user.
-  ///
-  /// Returns `null` if the backend is unreachable (network error / server down).
-  Future<HealthResponse?> checkHealth() async {
+  /// Check whether the backend is reachable.
+  Future<HealthResponse?> health() async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>('/health');
-      return HealthResponse.fromJson(response.data!);
-    } on DioException catch (e) {
-      // ignore: avoid_print
-      print('[NaviAble API] Health check failed: ${e.message}');
+      final r = await _dio.get<Map<String, dynamic>>('/healthz');
+      return HealthResponse.fromJson(r.data!);
+    } catch (_) {
       return null;
     }
   }
 
-  /// Submit a Dual-AI verification request to `POST /api/v1/verify`.
+  /// Find nearby places within a radius.
   ///
-  /// The image is sent as a multipart file.  The [imageBytes] should already
-  /// be compressed via `flutter_image_compress` before calling this method
-  /// (handled by the [VerifyNotifier] in the provider layer).
+  /// Returns a list of places (both from DB and Google Places) merged and
+  /// overlaid with trust data.
+  Future<List<PlaceSummary>> nearbyPlaces({
+    required double latitude,
+    required double longitude,
+    int radiusM = 800,
+    String? keyword,
+  }) async {
+    final r = await _dio.get<List<dynamic>>(
+      '/api/v1/places/nearby',
+      queryParameters: {
+        'latitude': latitude,
+        'longitude': longitude,
+        'radius_m': radiusM,
+        if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,
+      },
+    );
+    return r.data!
+        .map((e) => PlaceSummary.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Search for places by query.
+  ///
+  /// Returns autocomplete predictions with optional lat/lon bias.
+  Future<List<PlaceAutocomplete>> searchPlaces(
+    String query, {
+    double? latitude,
+    double? longitude,
+  }) async {
+    final r = await _dio.get<List<dynamic>>(
+      '/api/v1/places/search',
+      queryParameters: {
+        'query': query,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+      },
+    );
+    return r.data!
+        .map((e) => PlaceAutocomplete.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get full details for a place.
+  Future<PlaceDetail> placeDetail(String googlePlaceId) async {
+    final r = await _dio.get<Map<String, dynamic>>(
+      '/api/v1/places/$googlePlaceId',
+    );
+    return PlaceDetail.fromJson(r.data!);
+  }
+
+  /// Submit a Dual-AI verification request.
   ///
   /// Parameters:
   /// - [imageBytes]: Compressed JPEG image bytes.
   /// - [imageFilename]: Original filename (e.g. `'photo.jpg'`).
-  /// - [textReview]: The user's written accessibility review.
-  /// - [locationId]: A UUID string identifying the location being reviewed.
+  /// - [review]: The user's written accessibility review.
+  /// - [rating]: User's rating (1-5 stars).
+  /// - [googlePlaceId]: Optional explicit place ID.
+  /// - [latitude]: Optional device GPS latitude.
+  /// - [longitude]: Optional device GPS longitude.
+  /// - [address]: Optional address string for reverse geocoding.
   ///
-  /// Throws a [DioException] on network/server errors.  The caller (provider)
-  /// is responsible for catching this and setting error state.
+  /// The backend resolves location via priority chain:
+  /// 1. googlePlaceId (explicit user choice)
+  /// 2. (latitude, longitude) from device
+  /// 3. EXIF GPS from the image
+  /// 4. Reverse-geocode of address string
   Future<VerificationResponse> verify({
     required List<int> imageBytes,
     required String imageFilename,
-    required String textReview,
-    required String locationId,
+    required String review,
+    required int rating,
+    String? googlePlaceId,
+    double? latitude,
+    double? longitude,
+    String? address,
   }) async {
-    // Demo mode: use default location (San Francisco, CA)
-    // In production, these would come from the location picker UI
-    const double defaultLatitude = 37.7749;
-    const double defaultLongitude = -122.4194;
-    const int defaultRating = 3;
-
-    final formData = FormData.fromMap({
-      'review': textReview,
-      'latitude': defaultLatitude,
-      'longitude': defaultLongitude,
-      'rating': defaultRating,
+    final form = FormData.fromMap({
       'image': MultipartFile.fromBytes(
         imageBytes,
         filename: imageFilename,
         contentType: DioMediaType('image', 'jpeg'),
       ),
+      'review': review,
+      'rating': rating,
+      if (googlePlaceId != null) 'google_place_id': googlePlaceId,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+      if (address != null) 'address': address,
     });
-
-    final response = await _dio.post<Map<String, dynamic>>(
-      '/api/v1/verify',
-      data: formData,
-    );
-
-    return VerificationResponse.fromJson(response.data!);
+    final r = await _dio.post<Map<String, dynamic>>('/api/v1/verify', data: form);
+    return VerificationResponse.fromJson(r.data!);
   }
 }

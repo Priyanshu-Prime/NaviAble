@@ -39,6 +39,12 @@ class VerificationResponse {
   /// Unique identifier for this contribution.
   final String id;
 
+  /// UUID of the associated place (optional).
+  final String? placeId;
+
+  /// Name of the associated place (optional).
+  final String? placeName;
+
   /// Composite trust score: 0.60 × vision_score + 0.40 × nlp_score.
   /// Range: [0.0, 1.0]
   final double trustScore;
@@ -61,6 +67,8 @@ class VerificationResponse {
 
   const VerificationResponse({
     required this.id,
+    this.placeId,
+    this.placeName,
     required this.trustScore,
     required this.visionScore,
     required this.nlpScore,
@@ -83,6 +91,8 @@ class VerificationResponse {
 
     return VerificationResponse(
       id: json['id'] as String,
+      placeId: json['place_id']?.toString(),
+      placeName: json['place_name'] as String?,
       trustScore: (json['trust_score'] as num).toDouble(),
       visionScore: (json['vision_score'] as num).toDouble(),
       nlpScore: (json['nlp_score'] as num).toDouble(),
