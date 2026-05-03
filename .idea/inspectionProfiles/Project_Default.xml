@@ -1,0 +1,97 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="beautifulsoup4" />
+          <option value="blinker" />
+          <option value="cachetools" />
+          <option value="certifi" />
+          <option value="charset-normalizer" />
+          <option value="click" />
+          <option value="contourpy" />
+          <option value="cycler" />
+          <option value="Flask" />
+          <option value="fonttools" />
+          <option value="geographiclib" />
+          <option value="geopy" />
+          <option value="google" />
+          <option value="google-api-core" />
+          <option value="google-api-python-client" />
+          <option value="google-auth" />
+          <option value="google-auth-httplib2" />
+          <option value="google-auth-oauthlib" />
+          <option value="googleapis-common-protos" />
+          <option value="gspread" />
+          <option value="gspread-dataframe" />
+          <option value="httplib2" />
+          <option value="idna" />
+          <option value="importlib-metadata" />
+          <option value="importlib-resources" />
+          <option value="itsdangerous" />
+          <option value="Jinja2" />
+          <option value="kaleido" />
+          <option value="kiwisolver" />
+          <option value="MarkupSafe" />
+          <option value="matplotlib" />
+          <option value="natsort" />
+          <option value="numpy" />
+          <option value="oauth2client" />
+          <option value="oauthlib" />
+          <option value="packaging" />
+          <option value="pandas" />
+          <option value="Pillow" />
+          <option value="plotly" />
+          <option value="pyasn1" />
+          <option value="pyasn1-modules" />
+          <option value="pyjavaproperties" />
+          <option value="pyparsing" />
+          <option value="python-dateutil" />
+          <option value="pytz" />
+          <option value="requests" />
+          <option value="requests-oauthlib" />
+          <option value="rsa" />
+          <option value="six" />
+          <option value="soupsieve" />
+          <option value="tenacity" />
+          <option value="tzdata" />
+          <option value="uritemplate" />
+          <option value="urllib3" />
+          <option value="Werkzeug" />
+          <option value="zipp" />
+          <option value="boto3" />
+          <option value="botocore" />
+          <option value="aiohttp" />
+          <option value="httpx" />
+          <option value="scipy" />
+          <option value="psycopg2-binary" />
+          <option value="redis" />
+          <option value="Booktype" />
+          <option value="ortools" />
+          <option value="protobuf" />
+          <option value="h3" />
+          <option value="networkx" />
+          <option value="flask-cors" />
+          <option value="confluent-kafka" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyPep8NamingInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <option name="ignoredErrors">
+        <list>
+          <option value="N802" />
+          <option value="N803" />
+          <option value="N806" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredIdentifiers">
+        <list>
+          <option value="types.NoneType.*" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

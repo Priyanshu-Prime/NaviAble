@@ -15,6 +15,10 @@ pytest>=8.2.0
 pytest-asyncio>=0.23.0
 anyio>=4.4.0
 
+# ──── HTTP for Google Places ────
+tenacity>=9.0.0
+cachetools>=5.3.0
+
 # ──── ML Inference (structure only — weights loaded separately) ────
 torch>=2.0.0
 ultralytics>=8.0.0

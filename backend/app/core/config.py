@@ -42,6 +42,19 @@ class Settings(BaseSettings):
         description="Path to RoBERTa HuggingFace checkpoint dir.",
     )
 
+    # ── Google Places (server-side key) ─────────────────────────────────────
+    google_places_api_key: str = Field(default="", alias="GOOGLE_PLACES_API_KEY")
+    google_places_base_url: str = Field(
+        default="https://maps.googleapis.com/maps/api/place",
+    )
+    google_places_timeout_s: float = Field(default=8.0)
+    google_places_cache_ttl_s: int = Field(default=60)
+
+    # ── Discovery / aggregation ─────────────────────────────────────────────
+    nearby_default_radius_m: int = Field(default=800)
+    nearby_max_radius_m: int = Field(default=10_000)
+    trust_recency_half_life_days: int = Field(default=180)
+
     # ── Late fusion ─────────────────────────────────────────────────────────
     vision_threshold: float = Field(default=0.205, ge=0.0, le=1.0)
     vision_weight: float = Field(default=0.60, ge=0.0, le=1.0)

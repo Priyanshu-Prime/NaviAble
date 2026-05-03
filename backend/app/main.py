@@ -49,6 +49,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         log.warning("nlp.checkpoint_missing path=%s — using stub", roberta_dir)
         nlp = StubNlpService()
 
+    # Load Google Places service
+    from app.services.google_places import GooglePlacesService
+    google_places = GooglePlacesService(settings)
+    app.state.google_places = google_places
+
     app.state.vision = vision
     app.state.nlp = nlp
     log.info("naviable.ready")
@@ -56,8 +61,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     log.info("naviable.shutdown")
+    await app.state.google_places.aclose()
     del app.state.vision
     del app.state.nlp
+    del app.state.google_places
 
 
 def create_app() -> FastAPI:
@@ -92,9 +99,11 @@ def create_app() -> FastAPI:
     from app.api.routers.health import router as health_router
     from app.api.routers.verify import router as verify_router
     from app.api.routers.nearby import router as nearby_router
+    from app.api.routers.places import router as places_router
     app.include_router(health_router)
     app.include_router(verify_router)
     app.include_router(nearby_router)
+    app.include_router(places_router)
 
     # Static files (uploads served in dev)
     upload_dir = Path(settings.upload_dir)
