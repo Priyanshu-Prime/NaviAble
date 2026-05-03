@@ -34,7 +34,7 @@ final apiClientProvider = Provider<NaviAbleApiClient>(
 /// `keepAlive: true` ensures the health result is not discarded when the
 /// widget reading it is removed (e.g., during navigation).
 final healthProvider = FutureProvider.autoDispose<HealthResponse?>(
-  (ref) => ref.watch(apiClientProvider).checkHealth(),
+  (ref) => ref.watch(apiClientProvider).health(),
 );
 
 // ── Verification State ──────────────────────────────────────────────────────

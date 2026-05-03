@@ -43,6 +43,7 @@ class _PlaceSearchBarState extends ConsumerState<PlaceSearchBar> {
     return Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(12),
+      color: Theme.of(context).colorScheme.surface,
       child: Column(
         children: [
           TextField(
@@ -65,7 +66,7 @@ class _PlaceSearchBarState extends ConsumerState<PlaceSearchBar> {
                 borderSide: BorderSide.none,
               ),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: Theme.of(context).colorScheme.surface,
             ),
           ),
           results.maybeWhen(
@@ -73,24 +74,27 @@ class _PlaceSearchBarState extends ConsumerState<PlaceSearchBar> {
                 ? const SizedBox.shrink()
                 : ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 240),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: list.length,
-                      itemBuilder: (_, i) {
-                        final p = list[i];
-                        return ListTile(
-                          leading: const Icon(Icons.place_outlined),
-                          title: Text(p.mainText, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          subtitle: p.secondaryText == null
-                              ? null
-                              : Text(p.secondaryText!,
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
-                          onTap: () {
-                            FocusScope.of(context).unfocus();
-                            widget.onPick(p.googlePlaceId);
-                          },
-                        );
-                      },
+                    child: Container(
+                      color: Theme.of(context).colorScheme.surface,
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: list.length,
+                        itemBuilder: (_, i) {
+                          final p = list[i];
+                          return ListTile(
+                            leading: const Icon(Icons.place_outlined),
+                            title: Text(p.mainText, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: p.secondaryText == null
+                                ? null
+                                : Text(p.secondaryText!,
+                                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                            onTap: () {
+                              FocusScope.of(context).unfocus();
+                              widget.onPick(p.googlePlaceId);
+                            },
+                          );
+                        },
+                      ),
                     ),
                   ),
             orElse: () => const SizedBox.shrink(),
