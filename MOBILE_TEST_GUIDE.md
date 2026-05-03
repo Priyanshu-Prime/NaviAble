@@ -22,30 +22,64 @@ You'll be prompted to choose a device. The script will:
 ### 1. **Chrome (Web) - Fastest**
 ```bash
 ./run.sh
-# When prompted, choose: 1
+# Choose option 1
 ```
 - Best for quick testing
 - Full browser DevTools support
 - Can inspect network requests and database state
 - **Access:** http://127.0.0.1:5173
+- Maps API key must have "Maps JavaScript API" enabled
 
 ### 2. **macOS Desktop App - Mobile-like**
 ```bash
 ./run.sh
-# When prompted, choose: 2
+# Choose option 2
 ```
 - Most similar to actual mobile experience
 - Window size approximates mobile screen
-- Good for testing responsive UI
-- **Best for testing**: Touch interactions, mobile layouts, mobile-specific features
+- Good for testing responsive UI and touch interactions
+- Backend reachable via `localhost:8000`
 
-### 3. **Explicit Device Selection**
+### 3. **Android Emulator**
+```bash
+./run.sh
+# Choose option 3
+```
+- Backend reachable via `10.0.2.2:8000` (run.sh sets this automatically)
+- Mock GPS via Extended Controls → Location → "Set location"
+- Requires Maps SDK key for Android (restricted to package `ai.naviable`)
+
+### 4. **iOS Simulator**
+```bash
+./run.sh
+# Choose option 4
+```
+- Backend reachable via `localhost:8000`
+- Mock GPS via Xcode → Debug → Simulate Location
+- Requires Maps SDK key for iOS (restricted to bundle id `ai.naviable`)
+
+### 5. **Physical Device (Wi-Fi)**
+```bash
+./run.sh
+# Choose option 5
+```
+- Backend must be reachable on your Mac's LAN IP — open the firewall
+- iOS device may complain about a self-signed cert; we use plain HTTP in dev so this is fine
+- Automatically detects your local IP and sets API_BASE_URL accordingly
+
+### Explicit Device Selection
 ```bash
 # Use Chrome
 FLUTTER_DEVICE=chrome ./run.sh
 
 # Use macOS
 FLUTTER_DEVICE=macos ./run.sh
+
+# Use Android (custom device ID)
+FLUTTER_DEVICE=emulator-5554 ./run.sh
+
+# Use custom API URL
+API_BASE_URL=http://192.168.1.42:8000 ./run.sh
 ```
 
 ---

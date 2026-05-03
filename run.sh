@@ -231,21 +231,32 @@ else
     echo "Available devices:"
     flutter devices 2>/dev/null | grep -v "^$" | tail -n +2 || echo "  • chrome (Web browser)"
     echo ""
-    echo "Choose a device (or press Ctrl+C to exit):"
-    echo "  1) chrome (Web browser - recommended)"
-    echo "  2) android-emulator (Android Emulator)"
-    echo "  3) ios-simulator (iOS Simulator)"
-    echo ""
+    echo "Choose a device (Ctrl+C to exit):"
+    echo "  1) chrome  (web)"
+    echo "  2) macos   (desktop)"
+    echo "  3) android (emulator or USB) — uses 10.0.2.2 to reach host backend"
+    echo "  4) ios     (simulator) — uses localhost"
+    echo "  5) physical device on Wi-Fi (you set API_BASE_URL=http://<lan-ip>:8000)"
     read -p "Enter choice (default: 1): " device_choice
     case "$device_choice" in
       1|"") FLUTTER_DEVICE="chrome" ;;
-      2) FLUTTER_DEVICE="android-emulator" ;;
-      3) FLUTTER_DEVICE="ios-simulator" ;;
+      2)    FLUTTER_DEVICE="macos" ;;
+      3)
+        FLUTTER_DEVICE="$(flutter devices --machine | python3 -c "import json,sys;[print(d['id']) for d in json.load(sys.stdin) if 'android' in d.get('targetPlatform','').lower()]" | head -1)"
+        API_BASE_URL="http://10.0.2.2:${BACKEND_PORT}"
+        ;;
+      4)
+        FLUTTER_DEVICE="$(flutter devices --machine | python3 -c "import json,sys;[print(d['id']) for d in json.load(sys.stdin) if 'ios' in d.get('targetPlatform','').lower()]" | head -1)"
+        API_BASE_URL="http://localhost:${BACKEND_PORT}"
+        ;;
+      5)
+        read -p "Enter device ID: " FLUTTER_DEVICE
+        LAN_IP=$(ifconfig | awk '/inet /{print $2}' | grep -v 127.0.0.1 | head -1)
+        API_BASE_URL="${API_BASE_URL:-http://${LAN_IP}:${BACKEND_PORT}}"
+        echo "Using API_BASE_URL=$API_BASE_URL"
+        ;;
       *)
         read -p "Enter device ID: " FLUTTER_DEVICE
-        if [[ -z "$FLUTTER_DEVICE" ]]; then
-          FLUTTER_DEVICE="chrome"
-        fi
         ;;
     esac
   fi
