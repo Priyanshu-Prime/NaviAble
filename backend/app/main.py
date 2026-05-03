@@ -100,10 +100,12 @@ def create_app() -> FastAPI:
     from app.api.routers.verify import router as verify_router
     from app.api.routers.nearby import router as nearby_router
     from app.api.routers.places import router as places_router
+    from app.api.routers.training import router as training_router
     app.include_router(health_router)
     app.include_router(verify_router)
     app.include_router(nearby_router)
     app.include_router(places_router)
+    app.include_router(training_router)
 
     # Static files (uploads served in dev)
     upload_dir = Path(settings.upload_dir)

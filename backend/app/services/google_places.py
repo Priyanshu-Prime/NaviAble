@@ -126,3 +126,18 @@ class GooglePlacesService:
             return None
         results = data.get("results") or []
         return results[0] if results else None
+
+    async def geocode_address(self, *, address: str) -> Optional[dict[str, Any]]:
+        """Forward-geocode an address string, return first result or None."""
+        url = "https://maps.googleapis.com/maps/api/geocode/json"
+        params = {
+            "address": address,
+            "key": self._settings.google_places_api_key,
+        }
+        resp = await self._client.get(url, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("status") != "OK":
+            return None
+        results = data.get("results") or []
+        return results[0] if results else None

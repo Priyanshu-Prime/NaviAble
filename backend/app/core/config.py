@@ -73,6 +73,7 @@ class Settings(BaseSettings):
 
     # ── App ─────────────────────────────────────────────────────────────────
     demo_mode: bool = Field(default=False, alias="naviable_demo_mode")
+    admin_token: str = Field(default="", alias="ADMIN_TOKEN")
     cors_origins: list[str] = Field(
         default_factory=lambda: ["*"],
         alias="naviable_cors_origins",

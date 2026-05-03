@@ -33,6 +33,7 @@ def _to_pin(row: Contribution, settings: Settings) -> ContributionPin:
     point = to_shape(row.location)
     return ContributionPin(
         id=row.id,
+        place_id=row.place_id,
         latitude=round(point.y, 7),
         longitude=round(point.x, 7),
         trust_score=row.trust_score,
