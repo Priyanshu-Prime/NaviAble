@@ -49,10 +49,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         log.warning("nlp.checkpoint_missing path=%s — using stub", roberta_dir)
         nlp = StubNlpService()
 
-    # Load Google Places service
-    from app.services.google_places import GooglePlacesService
-    google_places = GooglePlacesService(settings)
-    app.state.google_places = google_places
+    # Load place search service (Nominatim / OpenStreetMap)
+    from app.services.nominatim import NominatimService
+    places = NominatimService(settings)
+    app.state.google_places = places
 
     app.state.vision = vision
     app.state.nlp = nlp

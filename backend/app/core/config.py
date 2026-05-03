@@ -42,7 +42,13 @@ class Settings(BaseSettings):
         description="Path to RoBERTa HuggingFace checkpoint dir.",
     )
 
-    # ── Google Places (server-side key) ─────────────────────────────────────
+    # ── Place Search (Nominatim / OpenStreetMap) ───────────────────────────────
+    nominatim_base_url: str = Field(default="https://nominatim.openstreetmap.org")
+    nominatim_user_agent: str = Field(default="NaviAble/1.0")
+    nominatim_timeout_s: float = Field(default=10.0)
+    nominatim_cache_ttl_s: int = Field(default=300)
+
+    # ── Deprecated: Google Places (kept for backwards compat) ──────────────────
     google_places_api_key: str = Field(default="", alias="GOOGLE_PLACES_API_KEY")
     google_places_base_url: str = Field(
         default="https://maps.googleapis.com/maps/api/place",
