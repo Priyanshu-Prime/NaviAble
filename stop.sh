@@ -8,12 +8,18 @@ usage() {
   cat <<'EOF'
 Usage: ./stop.sh [OPTIONS]
 
-Stops NaviAble project gracefully: frontend + backend + Docker services.
+Stops entire NaviAble project with one command: frontend + backend + database.
+
+Default behavior: Graceful shutdown of all services.
 
 Flags:
   -h, --help         Show this help message
-  -d, --docker-only  Stop only Docker containers
-  -a, --all          Kill all processes forcefully (emergency mode)
+  -d, --docker-only  Stop only Docker database (keep backend running)
+  -a, --all          Force kill all processes (emergency mode)
+
+Examples:
+  ./stop.sh          # Clean shutdown of everything
+  ./stop.sh -a       # Force kill (if services hang)
 
 EOF
 }
@@ -43,7 +49,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-echo "🛑 Stopping NaviAble project..."
+echo "🛑 Stopping NaviAble project (backend + frontend + database)..."
+echo ""
 
 # Kill backend if PID file exists
 if [[ -f "$PID_FILE" ]] && [[ ! "$DOCKER_ONLY" == "true" ]]; then
@@ -111,6 +118,8 @@ if [[ "$FORCE_KILL" == "true" ]]; then
 fi
 
 echo ""
-echo "✅ NaviAble project stopped"
+echo "✅ All services stopped"
 echo ""
-echo "To start again, run: ./run.sh"
+echo "To start entire project again: ./run.sh"
+echo "To start backend only: ./run.sh -b"
+echo "To start database only: ./run.sh -d"

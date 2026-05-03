@@ -9,12 +9,11 @@ PID_FILE="$ROOT_DIR/.naviable.pids"
 
 BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
-FLUTTER_DEVICE="${FLUTTER_DEVICE:-}"
+FLUTTER_DEVICE="${FLUTTER_DEVICE:-macos}"
 FLUTTER_WEB_HOST="${FLUTTER_WEB_HOST:-127.0.0.1}"
 FLUTTER_WEB_PORT="${FLUTTER_WEB_PORT:-5173}"
 NAVIABLE_DEMO_MODE="${NAVIABLE_DEMO_MODE:-false}"
 ENABLE_HYBRID_CLIP="${ENABLE_HYBRID_CLIP:-false}"
-# Default API URL varies by device: android uses 10.0.2.2, others use localhost
 API_BASE_URL="${API_BASE_URL:-http://${BACKEND_HOST}:${BACKEND_PORT}}"
 SKIP_PIP_INSTALL="${SKIP_PIP_INSTALL:-false}"
 YOLO_V10_MODEL="${YOLO_V10_MODEL:-./YoloModel11/runs/stair_ramp_m4_v1/weights/best.pt}"
@@ -28,26 +27,31 @@ usage() {
   cat <<'EOF'
 Usage: ./run.sh [OPTIONS]
 
-Starts NaviAble project: database (Docker) + backend + frontend.
+Starts entire NaviAble project with one command: database + backend + frontend app.
+
+Default behavior: Starts macOS desktop app with real YOLO weights.
 
 Optional environment variables:
+  FLUTTER_DEVICE     (default: macos) - Use 'chrome' for web, 'android', 'ios', or device ID
   BACKEND_HOST       (default: 127.0.0.1)
   BACKEND_PORT       (default: 8000)
-  FLUTTER_DEVICE     (default: chrome)
-  FLUTTER_WEB_HOST   (default: 127.0.0.1)
-  FLUTTER_WEB_PORT   (default: 5173)
-  NAVIABLE_DEMO_MODE (default: false)
-  ENABLE_HYBRID_CLIP (default: false)
   API_BASE_URL       (default: http://BACKEND_HOST:BACKEND_PORT)
-  SKIP_PIP_INSTALL   (default: false)
   YOLO_V10_MODEL     (default: ./YoloModel11/runs/stair_ramp_m4_v1/weights/best.pt)
-  SKIP_DOCKER        (default: false) - skip starting database
-  SKIP_FRONTEND      (default: false) - skip starting frontend
+  NAVIABLE_DEMO_MODE (default: false - uses real models)
+  SKIP_PIP_INSTALL   (default: false)
+  SKIP_DOCKER        (default: false)
+  SKIP_FRONTEND      (default: false)
 
 Flags:
-  -h, --help    Show this help message
-  -b, --backend-only Run only the backend (skip frontend)
-  -d, --docker-only  Start only Docker containers
+  -h, --help         Show this help message
+  -b, --backend-only Run only backend + database (no frontend)
+  -d, --docker-only  Start only Docker database
+
+Examples:
+  ./run.sh                                    # macOS desktop app
+  FLUTTER_DEVICE=chrome ./run.sh              # Web browser
+  FLUTTER_DEVICE=android ./run.sh             # Android emulator
+  ./run.sh -b                                 # Backend only (for testing)
 
 EOF
 }
@@ -223,45 +227,11 @@ if [[ "$SKIP_FRONTEND" == "true" ]] || [[ "$BACKEND_ONLY" == "true" ]]; then
   wait
 else
   echo ""
-  echo "🎨 Starting frontend..."
+  echo "🎨 Starting frontend on device: $FLUTTER_DEVICE"
+  echo "📱 App will use real weights from: $YOLO_V10_MODEL"
+  echo "🔌 API: $API_BASE_URL"
+  echo ""
 
-  # If no device specified, show options
-  if [[ -z "$FLUTTER_DEVICE" ]]; then
-    echo ""
-    echo "Available devices:"
-    flutter devices 2>/dev/null | grep -v "^$" | tail -n +2 || echo "  • chrome (Web browser)"
-    echo ""
-    echo "Choose a device (Ctrl+C to exit):"
-    echo "  1) chrome  (web)"
-    echo "  2) macos   (desktop)"
-    echo "  3) android (emulator or USB) — uses 10.0.2.2 to reach host backend"
-    echo "  4) ios     (simulator) — uses localhost"
-    echo "  5) physical device on Wi-Fi (you set API_BASE_URL=http://<lan-ip>:8000)"
-    read -p "Enter choice (default: 1): " device_choice
-    case "$device_choice" in
-      1|"") FLUTTER_DEVICE="chrome" ;;
-      2)    FLUTTER_DEVICE="macos" ;;
-      3)
-        FLUTTER_DEVICE="$(flutter devices --machine | python3 -c "import json,sys;[print(d['id']) for d in json.load(sys.stdin) if 'android' in d.get('targetPlatform','').lower()]" | head -1)"
-        API_BASE_URL="http://10.0.2.2:${BACKEND_PORT}"
-        ;;
-      4)
-        FLUTTER_DEVICE="$(flutter devices --machine | python3 -c "import json,sys;[print(d['id']) for d in json.load(sys.stdin) if 'ios' in d.get('targetPlatform','').lower()]" | head -1)"
-        API_BASE_URL="http://localhost:${BACKEND_PORT}"
-        ;;
-      5)
-        read -p "Enter device ID: " FLUTTER_DEVICE
-        LAN_IP=$(ifconfig | awk '/inet /{print $2}' | grep -v 127.0.0.1 | head -1)
-        API_BASE_URL="${API_BASE_URL:-http://${LAN_IP}:${BACKEND_PORT}}"
-        echo "Using API_BASE_URL=$API_BASE_URL"
-        ;;
-      *)
-        read -p "Enter device ID: " FLUTTER_DEVICE
-        ;;
-    esac
-  fi
-
-  echo "Using device: $FLUTTER_DEVICE"
   pushd "$FRONTEND_DIR" >/dev/null
   flutter pub get >/dev/null 2>&1 || true
   set +e
