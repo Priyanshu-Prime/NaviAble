@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import func, select, text
+from sqlalchemy import asc, desc, func, or_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,7 +52,7 @@ async def find_nearby(
         select(Contribution)
         .where(within_expr)
         .where(Contribution.visibility_status.in_(statuses))
-        .order_by(distance_expr.asc())
+        .order_by(asc(distance_expr))
         .limit(limit)
         .params(lat=lat, lon=lon, radius_m=radius_m)
     )
@@ -87,7 +87,7 @@ async def find_nearby_places(
         select(Place)
         .where(within_expr)
         .where(Place.aggregate_trust >= min_trust)
-        .order_by(distance_expr.asc())
+        .order_by(asc(distance_expr))
         .limit(limit)
         .params(lat=lat, lon=lon, radius_m=radius_m)
     )
@@ -163,10 +163,42 @@ async def find_reviewed_places(
         select(Place)
         .where(within_expr)
         .where(Place.contribution_count > 0)  # Any contribution, not just public
-        .order_by(distance_expr.asc())
+        .order_by(asc(distance_expr))
         .limit(limit)
         .params(lat=lat, lon=lon, radius_m=radius_m)
     )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_all_reviewed_places(
+    session: AsyncSession,
+    *,
+    query: str | None = None,
+    limit: int = 100,
+) -> list[Place]:
+    """Return all places with at least one public review, ordered by aggregate_trust DESC.
+
+    Optionally filters by name/address using the same ILIKE normalisation as
+    search_places_by_name. No spatial constraint — suitable for global search.
+    """
+    stmt = select(Place).where(Place.public_count > 0)
+
+    if query:
+        normalized_query = query.lower().replace(" ", "")
+        safe_query = normalized_query.replace("%", r"\%").replace("_", r"\_")
+        normalized_name = func.replace(func.lower(Place.name), " ", "")
+        normalized_addr = func.replace(
+            func.lower(func.coalesce(Place.formatted_address, "")), " ", ""
+        )
+        stmt = stmt.where(
+            or_(
+                normalized_name.ilike(f"%{safe_query}%"),
+                normalized_addr.ilike(f"%{safe_query}%"),
+            )
+        )
+
+    stmt = stmt.order_by(desc(Place.aggregate_trust)).limit(limit)
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
@@ -177,23 +209,33 @@ async def search_places_by_name(
     query: str,
     limit: int = 20,
 ) -> list[Place]:
-    """Search places by name using fuzzy matching (ILIKE).
+    """Search places by name or address using fuzzy matching (ILIKE).
 
     Normalizes query: lowercase and removes spaces for better matching.
-    Returns places that match the query string, sorted by exact match first,
-    then by aggregate trust (most trusted first).
+    Returns places that match the query string in name or formatted_address,
+    sorted by exact match first, then by aggregate trust (most trusted first).
     Also includes places with no reviews yet.
     """
+    from sqlalchemy import or_
+
     # Normalize query: lowercase and remove spaces
     normalized_query = query.lower().replace(" ", "")
     safe_query = normalized_query.replace("%", r"\%").replace("_", r"\_")
 
-    # Create normalized name column for comparison
+    # Create normalized columns for comparison
     normalized_name = func.replace(func.lower(Place.name), " ", "")
+    normalized_addr = func.replace(
+        func.lower(func.coalesce(Place.formatted_address, "")), " ", ""
+    )
 
     stmt = (
         select(Place)
-        .where(normalized_name.ilike(f"%{safe_query}%"))
+        .where(
+            or_(
+                normalized_name.ilike(f"%{safe_query}%"),
+                normalized_addr.ilike(f"%{safe_query}%"),
+            )
+        )
         .order_by(
             # Exact match first
             normalized_name == normalized_query,

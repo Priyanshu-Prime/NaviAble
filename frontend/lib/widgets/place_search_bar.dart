@@ -2,11 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../models/place_models.dart';
 import '../providers/places_provider.dart';
 
-typedef OnPickPlace = void Function(String googlePlaceId);
+typedef OnPickPlace = void Function(String googlePlaceId, LatLng? position);
 
 class PlaceSearchBar extends ConsumerStatefulWidget {
   final OnPickPlace onPick;
@@ -70,7 +71,7 @@ class _PlaceSearchBarState extends ConsumerState<PlaceSearchBar> {
                   : null,
               onTap: () {
                 FocusScope.of(context).unfocus();
-                widget.onPick(p.googlePlaceId);
+                widget.onPick(p.googlePlaceId, LatLng(p.latitude, p.longitude));
               },
             );
           },
@@ -101,7 +102,7 @@ class _PlaceSearchBarState extends ConsumerState<PlaceSearchBar> {
                       maxLines: 1, overflow: TextOverflow.ellipsis),
               onTap: () {
                 FocusScope.of(context).unfocus();
-                widget.onPick(p.googlePlaceId);
+                widget.onPick(p.googlePlaceId, null);
               },
             );
           },
@@ -149,19 +150,9 @@ class _PlaceSearchBarState extends ConsumerState<PlaceSearchBar> {
             ),
           ),
           dbResults.maybeWhen(
-            data: (dbList) {
-              // Show database results first (prioritize local data)
-              if (dbList.isNotEmpty) {
-                return _buildResultsList(context, dbList, isDatabase: true);
-              }
-              // Fall back to Google results if database found nothing
-              return googleResults.maybeWhen(
-                data: (googleList) => googleList.isEmpty
-                    ? const SizedBox.shrink()
-                    : _buildGoogleResultsList(context, googleList),
-                orElse: () => const SizedBox.shrink(),
-              );
-            },
+            data: (dbList) => dbList.isEmpty
+                ? const SizedBox.shrink()
+                : _buildResultsList(context, dbList, isDatabase: true),
             orElse: () => const SizedBox.shrink(),
           ),
         ],

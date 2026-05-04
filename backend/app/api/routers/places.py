@@ -18,6 +18,7 @@ from app.db.models import Contribution, Place
 from app.db.queries import (
     find_nearby_places,
     find_reviewed_places,
+    get_all_reviewed_places,
     search_places_by_name,
     upsert_place,
 )

@@ -289,7 +289,7 @@ class _ContributeScreenState extends ConsumerState<ContributeScreen> {
           top: 12, left: 12, right: 12,
         ),
         child: PlaceSearchBar(
-          onPick: (gid) {
+          onPick: (gid, position) {
             Navigator.pop(context);
             ref.read(contributeProvider.notifier).pickPlace(gid, 'Selected place');
           },

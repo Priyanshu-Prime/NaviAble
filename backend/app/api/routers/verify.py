@@ -60,6 +60,7 @@ async def verify(
         longitude=payload.longitude,
         address=payload.address,
         image_path=saved_path,
+        typed_address=payload.address,
     )
 
     vision_svc = request.app.state.vision

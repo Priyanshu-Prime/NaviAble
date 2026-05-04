@@ -10,9 +10,9 @@ import 'package:latlong2/latlong.dart';
 import '../models/place_models.dart';
 import '../providers/location_provider.dart';
 import '../providers/places_provider.dart';
+import '../providers/place_detail_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/place_search_bar.dart';
-import '../widgets/place_bottom_sheet.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -26,16 +26,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   LatLng? _currentCenter;
   Timer? _debounce;
   NearbyQuery? _activeQuery;
-  bool _onlyVerified = false;
   bool _onlyReviewed = false;
   bool _showSearchBar = true;
-  String? _selectedGid;
   double _currentZoom = 12;
 
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
+    _mapController.mapEventStream.listen((event) {
+      _onMapMoved();
+    });
   }
 
   @override
@@ -67,6 +68,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return base.clamp(100, 10000).toInt();
   }
 
+  void _centerOnPlace(String gid, LatLng position) {
+    _mapController.move(position, 14);
+    setState(() {
+      _activeQuery = NearbyQuery(
+        lat: position.latitude,
+        lon: position.longitude,
+        radiusM: _radiusFromZoom(14),
+      );
+    });
+  }
+
   Color _markerColorFor(PlaceSummary p) {
     if (!p.hasData) return Colors.blue;
     if (p.aggregateTrust >= 0.70) return Colors.green;
@@ -89,21 +101,32 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _ErrorOverlay(message: 'Location error: $e'),
         data: (loc) {
+          // Initialize query if not yet set
+          if (_activeQuery == null && _currentCenter == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              setState(() {
+                _currentCenter = LatLng(loc.latitude, loc.longitude);
+                _activeQuery = NearbyQuery(
+                  lat: loc.latitude,
+                  lon: loc.longitude,
+                  radiusM: _radiusFromZoom(_currentZoom),
+                );
+              });
+            });
+          }
+
           final placesRaw = placesAsync.maybeWhen(
             data: (l) => l,
             orElse: () => const <PlaceSummary>[],
           );
-          final filtered = _onlyVerified
-              ? placesRaw.where((p) => p.hasData && p.aggregateTrust >= 0.70).toList()
-              : placesRaw;
 
-          final markers = filtered
+          final markers = placesRaw
               .map((p) => Marker(
                     point: LatLng(p.latitude, p.longitude),
                     width: 40,
                     height: 40,
                     child: GestureDetector(
-                      onTap: () => setState(() => _selectedGid = p.googlePlaceId),
+                      onTap: () => context.push('/place/${p.googlePlaceId}'),
                       child: Icon(
                         Icons.location_on,
                         color: _markerColorFor(p),
@@ -112,11 +135,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ),
                   ))
               .toList();
-
-          final selected = filtered
-              .where((p) => p.googlePlaceId == _selectedGid)
-              .cast<PlaceSummary?>()
-              .firstWhere((_) => true, orElse: () => null);
 
           return Stack(
             children: [
@@ -131,6 +149,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'ai.naviable',
                   ),
+                  if (_activeQuery != null)
+                    CircleLayer(
+                      circles: [
+                        CircleMarker(
+                          point: LatLng(_activeQuery!.lat, _activeQuery!.lon),
+                          radius: _activeQuery!.radiusM.toDouble(),
+                          useRadiusInMeter: true,
+                          color: Colors.blue.withOpacity(0.08),
+                          borderColor: Colors.blue.withOpacity(0.5),
+                          borderStrokeWidth: 2,
+                        ),
+                      ],
+                    ),
                   MarkerLayer(markers: markers),
                 ],
               ),
@@ -143,7 +174,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     child: Stack(
                       children: [
                         PlaceSearchBar(
-                          onPick: (gid) => context.push('/place/$gid'),
+                          onPick: (gid, position) async {
+                            FocusScope.of(context).unfocus();
+                            if (position != null) {
+                              _centerOnPlace(gid, position);
+                            } else {
+                              try {
+                                final detail = await ref.read(placeDetailProvider(gid).future);
+                                if (mounted) {
+                                  _centerOnPlace(gid, LatLng(detail.latitude, detail.longitude));
+                                }
+                              } catch (_) {
+                                if (mounted) context.push('/place/$gid');
+                              }
+                            }
+                          },
                         ),
                         Positioned(
                           right: 8,
@@ -181,28 +226,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 top: 80,
                 left: 12,
                 child: SafeArea(
-                  child: Row(
-                    children: [
-                      FilterChip(
-                        label: Text(_onlyVerified ? 'Verified only' : 'All places'),
-                        avatar: Icon(_onlyVerified ? Icons.verified : Icons.public, size: 18),
-                        selected: _onlyVerified,
-                        onSelected: (v) => setState(() => _onlyVerified = v),
-                      ),
-                      const SizedBox(width: 8),
-                      FilterChip(
-                        label: Text(_onlyReviewed ? 'Reviewed (${_activeQuery?.radiusM ?? 0}m)' : 'All'),
-                        avatar: Icon(_onlyReviewed ? Icons.rate_review : Icons.map, size: 18),
-                        selected: _onlyReviewed,
-                        onSelected: (v) => setState(() => _onlyReviewed = v),
-                      ),
-                    ],
+                  child: FilterChip(
+                    label: Text(_onlyReviewed ? 'Reviewed (${_activeQuery?.radiusM ?? 0}m)' : 'All'),
+                    avatar: Icon(_onlyReviewed ? Icons.rate_review : Icons.map, size: 18),
+                    selected: _onlyReviewed,
+                    onSelected: (v) => setState(() => _onlyReviewed = v),
                   ),
                 ),
               ),
 
               // Loading indicator
-              if (placesAsync.isLoading && filtered.isEmpty)
+              if (placesAsync.isLoading && placesRaw.isEmpty)
                 const Positioned(
                   top: 16,
                   right: 16,
@@ -212,6 +246,37 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 ),
+
+              // Zoom buttons
+              Positioned(
+                right: 12,
+                top: 80,
+                child: Column(
+                  children: [
+                    FloatingActionButton.small(
+                      heroTag: 'zoom_in',
+                      onPressed: () {
+                        _mapController.move(
+                          _mapController.camera.center,
+                          _mapController.camera.zoom + 1,
+                        );
+                      },
+                      child: const Icon(Icons.add),
+                    ),
+                    const SizedBox(height: 8),
+                    FloatingActionButton.small(
+                      heroTag: 'zoom_out',
+                      onPressed: () {
+                        _mapController.move(
+                          _mapController.camera.center,
+                          _mapController.camera.zoom - 1,
+                        );
+                      },
+                      child: const Icon(Icons.remove),
+                    ),
+                  ],
+                ),
+              ),
 
               // Recenter FAB
               Positioned(
@@ -234,33 +299,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 child: FloatingActionButton.extended(
                   heroTag: 'add',
                   backgroundColor: NaviAbleColors.primary,
-                  onPressed: () {
-                    if (selected != null) {
-                      context.push('/contribute', extra: {
-                        'gid': selected.googlePlaceId,
-                        'name': selected.name,
-                      });
-                    } else {
-                      context.push('/contribute');
-                    }
-                  },
+                  onPressed: () => context.push('/contribute'),
                   icon: const Icon(Icons.add_a_photo, color: Colors.white),
                   label: const Text('Add review', style: TextStyle(color: Colors.white)),
                 ),
               ),
-
-              // Selected pin sheet
-              if (selected != null)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: PlaceBottomSheet(
-                    place: selected,
-                    onClose: () => setState(() => _selectedGid = null),
-                    onOpen: () => context.push('/place/${selected.googlePlaceId}'),
-                  ),
-                ),
             ],
           );
         },

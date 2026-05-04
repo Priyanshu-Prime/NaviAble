@@ -36,6 +36,7 @@ async def resolve_place(
     longitude: Optional[float],
     address: Optional[str],
     image_path: Path,
+    typed_address: Optional[str] = None,
 ) -> Tuple[Place, float, float]:
     """Resolve location via priority chain, return (Place, lat, lon)."""
     # 1. explicit place id
@@ -70,13 +71,17 @@ async def resolve_place(
 
     # 2. raw coordinates
     if latitude is not None and longitude is not None:
-        return await _resolve_from_coords(session, google, latitude, longitude)
+        return await _resolve_from_coords(
+            session, google, latitude, longitude, typed_address=typed_address
+        )
 
     # 3. EXIF GPS
     gps = extract_gps(image_path)
     if gps is not None:
         log.info("verify.exif_gps lat=%s lon=%s", *gps)
-        return await _resolve_from_coords(session, google, gps[0], gps[1])
+        return await _resolve_from_coords(
+            session, google, gps[0], gps[1], typed_address=typed_address
+        )
 
     # 4. address geocode
     if address:
@@ -87,7 +92,8 @@ async def resolve_place(
         if geo and "geometry" in geo:
             loc = geo["geometry"]["location"]
             return await _resolve_from_coords(
-                session, google, float(loc["lat"]), float(loc["lng"])
+                session, google, float(loc["lat"]), float(loc["lng"]),
+                typed_address=typed_address
             )
 
     raise HTTPException(
@@ -102,6 +108,7 @@ async def _resolve_from_coords(
     google: GooglePlacesService,
     lat: float,
     lon: float,
+    typed_address: Optional[str] = None,
 ) -> Tuple[Place, float, float]:
     """Reverse-geocode (lat,lon) → place_id → upsert."""
     try:
@@ -115,11 +122,16 @@ async def _resolve_from_coords(
     if not pid:
         raise HTTPException(422, "Reverse-geocode returned no place_id")
     types = geo.get("types", [])
+
+    # Use typed_address if provided (user's original search), otherwise use Google's result
+    formatted_addr = typed_address or geo.get("formatted_address")
+    name = (typed_address or geo.get("formatted_address", "Unnamed place")).split(",")[0]
+
     place = await upsert_place(
         session,
         google_place_id=pid,
-        name=geo.get("formatted_address", "Unnamed place").split(",")[0],
-        formatted_address=geo.get("formatted_address"),
+        name=name,
+        formatted_address=formatted_addr,
         lat=lat,
         lon=lon,
         google_types=types,
