@@ -176,6 +176,22 @@ class NaviAbleApiClient {
         .toList();
   }
 
+  /// Get all places with at least one public review.
+  ///
+  /// Optional [query] filters by name/address. Empty string or no query returns
+  /// all reviewed places ordered by aggregate trust descending. Limit 100.
+  Future<List<PlaceSummary>> reviewedAll({String? query}) async {
+    final r = await _dio.get<List<dynamic>>(
+      '/api/v1/places/reviewed/all',
+      queryParameters: {
+        if (query != null && query.isNotEmpty) 'q': query,
+      },
+    );
+    return r.data!
+        .map((e) => PlaceSummary.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Submit a Dual-AI verification request.
   ///
   /// Parameters:

@@ -66,3 +66,14 @@ final reviewedNearbyProvider =
     radiusM: q.radiusM,
   );
 });
+
+/// All reviewed places, optionally filtered by name.
+///
+/// Empty/short query returns all reviewed places (no server-side filter).
+/// Queries >= 2 chars are sent to the server for filtering.
+final reviewedAllProvider =
+    FutureProvider.family<List<PlaceSummary>, String>((ref, query) async {
+  final api = ref.watch(apiClientProvider);
+  final q = query.trim();
+  return api.reviewedAll(query: q.length >= 2 ? q : null);
+});

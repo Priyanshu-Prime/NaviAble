@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../models/place_models.dart';
@@ -35,48 +36,40 @@ class _PlaceSearchBarState extends ConsumerState<PlaceSearchBar> {
     super.dispose();
   }
 
-  Widget _buildResultsList(
+  Widget _buildReviewedResultsList(
     BuildContext context,
-    List<PlaceSummary> places, {
-    required bool isDatabase,
-  }) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 240),
-      child: Container(
-        color: Theme.of(context).colorScheme.surface,
-        child: ListView.builder(
-          shrinkWrap: true,
-          itemCount: places.length,
-          itemBuilder: (_, i) {
-            final p = places[i];
-            return ListTile(
-              leading: const Icon(Icons.location_on),
-              title: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: p.formattedAddress == null
-                  ? null
-                  : Text(p.formattedAddress!,
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-              trailing: p.publicCount > 0
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '${p.publicCount} reviews',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    )
-                  : null,
-              onTap: () {
-                FocusScope.of(context).unfocus();
-                widget.onPick(p.googlePlaceId, LatLng(p.latitude, p.longitude));
-              },
-            );
+    List<PlaceSummary> places,
+  ) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: places.length,
+      itemBuilder: (_, i) {
+        final p = places[i];
+        return ListTile(
+          leading: const Icon(Icons.rate_review_outlined),
+          title: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: p.formattedAddress == null
+              ? null
+              : Text(p.formattedAddress!,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '${p.publicCount} review${p.publicCount == 1 ? "" : "s"}',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+          onTap: () {
+            FocusScope.of(context).unfocus();
+            context.push('/place/${p.googlePlaceId}');
           },
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -113,18 +106,17 @@ class _PlaceSearchBarState extends ConsumerState<PlaceSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final reviewedAll = ref.watch(reviewedAllProvider(_query));
     final googleResults = _query.length < 2
         ? const AsyncValue<List<PlaceAutocomplete>>.data([])
         : ref.watch(searchProvider(_query));
-    final dbResults = _query.length < 2
-        ? const AsyncValue<List<PlaceSummary>>.data([])
-        : ref.watch(databaseSearchProvider(_query));
 
     return Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(12),
       color: Theme.of(context).colorScheme.surface,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
             controller: _controller,
@@ -149,11 +141,61 @@ class _PlaceSearchBarState extends ConsumerState<PlaceSearchBar> {
               fillColor: Theme.of(context).colorScheme.surface,
             ),
           ),
-          dbResults.maybeWhen(
-            data: (dbList) => dbList.isEmpty
-                ? const SizedBox.shrink()
-                : _buildResultsList(context, dbList, isDatabase: true),
-            orElse: () => const SizedBox.shrink(),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 400),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  reviewedAll.maybeWhen(
+                    data: (places) {
+                      if (places.isEmpty) return const SizedBox.shrink();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_query.length >= 2)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                              child: Text(
+                                'Reviewed places',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(color: Colors.grey),
+                              ),
+                            ),
+                          _buildReviewedResultsList(context, places),
+                        ],
+                      );
+                    },
+                    orElse: () => const SizedBox.shrink(),
+                  ),
+                  if (_query.length >= 2)
+                    googleResults.maybeWhen(
+                      data: (gList) {
+                        if (gList.isEmpty) return const SizedBox.shrink();
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                              child: Text(
+                                'Google Places',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(color: Colors.grey),
+                              ),
+                            ),
+                            _buildGoogleResultsList(context, gList),
+                          ],
+                        );
+                      },
+                      orElse: () => const SizedBox.shrink(),
+                    ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

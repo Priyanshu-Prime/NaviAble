@@ -193,6 +193,26 @@ async def search(
     ]
 
 
+@router.get("/reviewed/all", response_model=list[PlaceSummary])
+async def reviewed_all(
+    response: Response,
+    q: Optional[str] = Query(None, max_length=120),
+    session: AsyncSession = Depends(get_session),
+) -> list[PlaceSummary]:
+    """All places with at least one public review, ordered by trust DESC.
+
+    Optional ``q`` filters by name/address (same normalised ILIKE as /search/db).
+    Limit is capped at 100. No lat/lon required.
+    """
+    places = await get_all_reviewed_places(
+        session,
+        query=q.strip() if q and q.strip() else None,
+        limit=100,
+    )
+    response.headers["Cache-Control"] = "public, max-age=30"
+    return [_row_to_summary(p) for p in places]
+
+
 @router.get("/{place_identifier}", response_model=PlaceDetail)
 async def detail(
     place_identifier: str,
