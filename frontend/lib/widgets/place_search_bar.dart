@@ -34,11 +34,90 @@ class _PlaceSearchBarState extends ConsumerState<PlaceSearchBar> {
     super.dispose();
   }
 
+  Widget _buildResultsList(
+    BuildContext context,
+    List<PlaceSummary> places, {
+    required bool isDatabase,
+  }) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 240),
+      child: Container(
+        color: Theme.of(context).colorScheme.surface,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: places.length,
+          itemBuilder: (_, i) {
+            final p = places[i];
+            return ListTile(
+              leading: const Icon(Icons.location_on),
+              title: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: p.formattedAddress == null
+                  ? null
+                  : Text(p.formattedAddress!,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+              trailing: p.publicCount > 0
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${p.publicCount} reviews',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    )
+                  : null,
+              onTap: () {
+                FocusScope.of(context).unfocus();
+                widget.onPick(p.googlePlaceId);
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGoogleResultsList(
+    BuildContext context,
+    List<PlaceAutocomplete> places,
+  ) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 240),
+      child: Container(
+        color: Theme.of(context).colorScheme.surface,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: places.length,
+          itemBuilder: (_, i) {
+            final p = places[i];
+            return ListTile(
+              leading: const Icon(Icons.place_outlined),
+              title: Text(p.mainText, maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: p.secondaryText == null
+                  ? null
+                  : Text(p.secondaryText!,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+              onTap: () {
+                FocusScope.of(context).unfocus();
+                widget.onPick(p.googlePlaceId);
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final results = _query.length < 2
+    final googleResults = _query.length < 2
         ? const AsyncValue<List<PlaceAutocomplete>>.data([])
         : ref.watch(searchProvider(_query));
+    final dbResults = _query.length < 2
+        ? const AsyncValue<List<PlaceSummary>>.data([])
+        : ref.watch(databaseSearchProvider(_query));
 
     return Material(
       elevation: 4,
@@ -69,34 +148,20 @@ class _PlaceSearchBarState extends ConsumerState<PlaceSearchBar> {
               fillColor: Theme.of(context).colorScheme.surface,
             ),
           ),
-          results.maybeWhen(
-            data: (list) => list.isEmpty
-                ? const SizedBox.shrink()
-                : ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 240),
-                    child: Container(
-                      color: Theme.of(context).colorScheme.surface,
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: list.length,
-                        itemBuilder: (_, i) {
-                          final p = list[i];
-                          return ListTile(
-                            leading: const Icon(Icons.place_outlined),
-                            title: Text(p.mainText, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: p.secondaryText == null
-                                ? null
-                                : Text(p.secondaryText!,
-                                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                            onTap: () {
-                              FocusScope.of(context).unfocus();
-                              widget.onPick(p.googlePlaceId);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ),
+          dbResults.maybeWhen(
+            data: (dbList) {
+              // Show database results first (prioritize local data)
+              if (dbList.isNotEmpty) {
+                return _buildResultsList(context, dbList, isDatabase: true);
+              }
+              // Fall back to Google results if database found nothing
+              return googleResults.maybeWhen(
+                data: (googleList) => googleList.isEmpty
+                    ? const SizedBox.shrink()
+                    : _buildGoogleResultsList(context, googleList),
+                orElse: () => const SizedBox.shrink(),
+              );
+            },
             orElse: () => const SizedBox.shrink(),
           ),
         ],

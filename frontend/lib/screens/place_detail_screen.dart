@@ -1,8 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../models/place_models.dart';
 import '../providers/place_detail_provider.dart';
@@ -54,13 +55,17 @@ class PlaceDetailScreen extends ConsumerWidget {
                 ),
               ),
               SliverToBoxAdapter(child: _heroBlock(context, p, color)),
+              SliverToBoxAdapter(child: _mapWidget(p)),
               SliverToBoxAdapter(child: _photoCarousel(p)),
-              SliverToBoxAdapter(child: _reviewSectionHeader(p)),
-              SliverList.separated(
-                itemCount: p.contributions.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (_, i) => _ReviewTile(pin: p.contributions[i]),
-              ),
+              SliverToBoxAdapter(child: _reviewSectionHeader(p, context)),
+              if (p.contributions.isEmpty)
+                SliverToBoxAdapter(child: _emptyReviewsWidget(context))
+              else
+                SliverList.separated(
+                  itemCount: p.contributions.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) => _ReviewTile(pin: p.contributions[i]),
+                ),
               const SliverToBoxAdapter(child: SizedBox(height: 96)),
             ],
           );
@@ -85,7 +90,7 @@ class PlaceDetailScreen extends ConsumerWidget {
   Widget _heroBlock(BuildContext ctx, PlaceDetail p, Color color) {
     final pct = (p.aggregateTrust * 100).round();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -131,7 +136,10 @@ class PlaceDetailScreen extends ConsumerWidget {
                       Text(p.hasData
                           ? 'Trust $pct%  ·  ${p.publicCount} verified review'
                               '${p.publicCount == 1 ? "" : "s"}'
-                          : 'Be the first to verify accessibility here.'),
+                          : p.contributions.isNotEmpty
+                              ? '${p.contributions.length} community review'
+                                  '${p.contributions.length == 1 ? "" : "s"}'
+                              : 'Be the first to verify accessibility here.'),
                     ],
                   ),
                 ),
@@ -144,38 +152,114 @@ class PlaceDetailScreen extends ConsumerWidget {
   }
 
   Widget _photoCarousel(PlaceDetail p) {
-    final urls = p.contributions
+    // Get contributions with images sorted by trust score (highest first)
+    final withImages = p.contributions
         .where((c) => c.imageUrl != null)
-        .map((c) => c.imageUrl!)
         .toList();
-    if (urls.isEmpty) return const SizedBox.shrink();
+
+    if (withImages.isEmpty) return const SizedBox.shrink();
+
+    // Sort by trust score descending to show best first
+    withImages.sort((a, b) => b.trustScore.compareTo(a.trustScore));
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
-      child: SizedBox(
-        height: 140,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          itemCount: urls.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (_, i) => ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: CachedNetworkImage(
-              imageUrl: urls[i],
-              width: 160, height: 140, fit: BoxFit.cover,
-              placeholder: (_, __) => Container(color: Colors.grey.shade200),
-              errorWidget: (_, __, ___) => Container(
-                color: Colors.grey.shade300,
-                child: const Icon(Icons.broken_image),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Best image (highest trust score) featured at top
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: CachedNetworkImage(
+                imageUrl: withImages[0].imageUrl!,
+                width: double.infinity,
+                height: 200,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(
+                  height: 200,
+                  color: Colors.grey.shade200,
+                ),
+                errorWidget: (_, __, ___) => Container(
+                  height: 200,
+                  color: Colors.grey.shade300,
+                  child: const Icon(Icons.broken_image),
+                ),
               ),
             ),
+          ),
+          if (withImages.length > 1) ...[
+            const SizedBox(height: 12),
+            // More images carousel
+            SizedBox(
+              height: 100,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: withImages.length - 1,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl: withImages[i + 1].imageUrl!,
+                    width: 120,
+                    height: 100,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => Container(color: Colors.grey.shade200),
+                    errorWidget: (_, __, ___) => Container(
+                      color: Colors.grey.shade300,
+                      child: const Icon(Icons.image_not_supported, size: 20),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _mapWidget(PlaceDetail p) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          height: 250,
+          child: FlutterMap(
+            options: MapOptions(
+              initialCenter: LatLng(p.latitude, p.longitude),
+              initialZoom: 14,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'ai.naviable',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: LatLng(p.latitude, p.longitude),
+                    width: 40,
+                    height: 40,
+                    child: Icon(
+                      Icons.location_on,
+                      color: NaviAbleColors.primary,
+                      size: 40,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _reviewSectionHeader(PlaceDetail p) {
+  Widget _reviewSectionHeader(PlaceDetail p, BuildContext ctx) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
@@ -184,6 +268,35 @@ class PlaceDetailScreen extends ConsumerWidget {
           const SizedBox(width: 8),
           Text('Reviews (${p.contributions.length})',
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyReviewsWidget(BuildContext ctx) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Column(
+        children: [
+          Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey.shade400),
+          const SizedBox(height: 12),
+          Text(
+            'No reviews yet',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Be the first to share your accessibility experience at this location',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
         ],
       ),
     );

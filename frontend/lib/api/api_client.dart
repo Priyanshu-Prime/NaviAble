@@ -129,12 +129,51 @@ class NaviAbleApiClient {
         .toList();
   }
 
-  /// Get full details for a place.
-  Future<PlaceDetail> placeDetail(String googlePlaceId) async {
+  /// Get full details for a place by ID or name.
+  ///
+  /// Supports both Google Place IDs and place names. The backend will:
+  /// 1. Try to find by google_place_id first
+  /// 2. Fall back to Google Places API if not found locally
+  /// 3. Search database by name as final fallback
+  Future<PlaceDetail> placeDetail(String placeIdentifier) async {
     final r = await _dio.get<Map<String, dynamic>>(
-      '/api/v1/places/$googlePlaceId',
+      '/api/v1/places/$placeIdentifier',
     );
     return PlaceDetail.fromJson(r.data!);
+  }
+
+  /// Search places in the database by name.
+  ///
+  /// Use this when a place is not available in Google Places.
+  Future<List<PlaceSummary>> searchPlacesInDatabase(String query) async {
+    final r = await _dio.get<List<dynamic>>(
+      '/api/v1/places/search/db',
+      queryParameters: {'query': query},
+    );
+    return r.data!
+        .map((e) => PlaceSummary.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get places with reviews within a radius.
+  ///
+  /// Returns only places that have public reviews, sorted by distance.
+  Future<List<PlaceSummary>> reviewedNearby({
+    required double latitude,
+    required double longitude,
+    int radiusM = 5000,
+  }) async {
+    final r = await _dio.get<List<dynamic>>(
+      '/api/v1/places/reviewed/nearby',
+      queryParameters: {
+        'latitude': latitude,
+        'longitude': longitude,
+        'radius_m': radiusM,
+      },
+    );
+    return r.data!
+        .map((e) => PlaceSummary.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Submit a Dual-AI verification request.

@@ -15,7 +15,12 @@ from app.api.deps import get_google_places
 from app.api.routers.nearby import _compose_image_url
 from app.core.config import Settings, get_settings
 from app.db.models import Contribution, Place
-from app.db.queries import find_nearby_places, upsert_place
+from app.db.queries import (
+    find_nearby_places,
+    find_reviewed_places,
+    search_places_by_name,
+    upsert_place,
+)
 from app.db.session import get_session
 from app.schemas.contribution import ContributionPin
 from app.schemas.place import PlaceAutocomplete, PlaceDetail, PlaceSummary
@@ -59,6 +64,31 @@ def _google_to_summary(g: dict) -> PlaceSummary:
         contribution_count=0,
         has_data=False,
     )
+
+
+@router.get("/reviewed/nearby", response_model=list[PlaceSummary])
+async def reviewed_nearby(
+    response: Response,
+    latitude: float = Query(..., ge=-90, le=90),
+    longitude: float = Query(..., ge=-180, le=180),
+    radius_m: int = Query(5000, gt=0),
+    session: AsyncSession = Depends(get_session),
+) -> list[PlaceSummary]:
+    """Get places with reviews (public contributions) within radius.
+
+    Returns only places that have been reviewed by the community, sorted by distance.
+    Default radius is 5km.
+    """
+    radius_m = min(radius_m, 25000)
+    places = await find_reviewed_places(
+        session,
+        lat=latitude,
+        lon=longitude,
+        radius_m=radius_m,
+        limit=200,
+    )
+    response.headers["Cache-Control"] = "public, max-age=15"
+    return [_row_to_summary(p) for p in places]
 
 
 @router.get("/nearby", response_model=list[PlaceSummary])
@@ -125,6 +155,20 @@ async def nearby(
     return out
 
 
+@router.get("/search/db", response_model=list[PlaceSummary])
+async def search_database(
+    query: str = Query(..., min_length=1, max_length=120),
+    session: AsyncSession = Depends(get_session),
+) -> list[PlaceSummary]:
+    """Search places in the database by name.
+
+    This endpoint searches the local database for places that match the query.
+    Use this when a place is not available in Google Places.
+    """
+    results = await search_places_by_name(session, query=query, limit=20)
+    return [_row_to_summary(r) for r in results]
+
+
 @router.get("/search", response_model=list[PlaceAutocomplete])
 async def search(
     query: str = Query(..., min_length=1, max_length=120),
@@ -148,41 +192,58 @@ async def search(
     ]
 
 
-@router.get("/{google_place_id}", response_model=PlaceDetail)
+@router.get("/{place_identifier}", response_model=PlaceDetail)
 async def detail(
-    google_place_id: str,
+    place_identifier: str,
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
     google: GooglePlacesService = Depends(get_google_places),
 ) -> PlaceDetail:
     """Full place page: aggregate trust + recent contributions.
 
-    If the place is not in our DB yet, we fetch its details from Google,
-    *upsert* it (so subsequent calls hit the DB), and return zero contributions.
+    Supports two modes:
+    1. Google Place ID (starts with "ChIJ" or similar) - fetches from Google, upserts to DB
+    2. Place name - searches database for exact/fuzzy matches
+
+    Priority: Database first (local data), then Google Places API as fallback.
     """
-    stmt = select(Place).where(Place.google_place_id == google_place_id)
-    place = (await session.execute(stmt)).scalar_one_or_none()
+    # First, try to fetch by google_place_id if it looks like one
+    place = (await session.execute(
+        select(Place).where(Place.google_place_id == place_identifier)
+    )).scalar_one_or_none()
+
+    # If not found by google_place_id, try searching database by name first
+    if place is None:
+        search_results = await search_places_by_name(
+            session, query=place_identifier, limit=1
+        )
+        if search_results:
+            place = search_results[0]
+
+    # If still not found, try Google Places API as fallback
+    if place is None:
+        # Try Google Places API if it looks like a valid Google Place ID
+        # Google IDs typically start with "ChIJ" or are long alphanumeric strings
+        if place_identifier.startswith("ChIJ") or len(place_identifier) > 20:
+            try:
+                details = await google.details(place_id=place_identifier)
+                if details:
+                    loc = details["geometry"]["location"]
+                    place = await upsert_place(
+                        session,
+                        google_place_id=place_identifier,
+                        name=details.get("name", ""),
+                        formatted_address=details.get("formatted_address"),
+                        lat=float(loc["lat"]),
+                        lon=float(loc["lng"]),
+                        google_types=details.get("types", []),
+                    )
+                    await session.commit()
+            except GooglePlacesUnavailable:
+                pass
 
     if place is None:
-        try:
-            details = await google.details(place_id=google_place_id)
-        except GooglePlacesUnavailable as exc:
-            raise HTTPException(503, "Place details unavailable") from exc
-
-        if not details:
-            raise HTTPException(404, "Place not found")
-
-        loc = details["geometry"]["location"]
-        place = await upsert_place(
-            session,
-            google_place_id=google_place_id,
-            name=details.get("name", ""),
-            formatted_address=details.get("formatted_address"),
-            lat=float(loc["lat"]),
-            lon=float(loc["lng"]),
-            google_types=details.get("types", []),
-        )
-        await session.commit()
+        raise HTTPException(404, "Place not found in database or Google Places")
 
     # Pull recent public/caveat contributions
     crows = (

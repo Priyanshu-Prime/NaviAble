@@ -50,16 +50,16 @@ dependencies:
   go_router: ^14.2.0
 
   # ── Maps + Geolocation ────────────────────────────────────────────────
-  # google_maps_flutter: Embed Google Maps, markers, polylines.
+  # flutter_map: Open-source map widget (OpenStreetMap) with no API key needed.
+  # latlong2: LatLng coordinate representation for flutter_map.
   # geolocator: Cross-platform location access with permissions handling.
   # geocoding: Forward/reverse geocoding using platform-native services.
   # flutter_polyline_points: Decode encoded polyline from Directions API.
-  # google_maps_flutter_platform_interface: Platform interface for custom impls.
-  google_maps_flutter: ^2.7.0
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.1
   geolocator: ^12.0.0
   geocoding: ^3.0.0
   flutter_polyline_points: ^2.1.0
-  google_maps_flutter_platform_interface: ^2.7.0
 
   # ── Image Metadata ────────────────────────────────────────────────────
   # native_exif: Read EXIF GPS on-device for early location validation.

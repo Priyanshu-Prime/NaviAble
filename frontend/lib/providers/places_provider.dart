@@ -45,3 +45,24 @@ final searchProvider = FutureProvider.family<List<PlaceAutocomplete>, String>(
     return api.searchPlaces(query);
   },
 );
+
+final databaseSearchProvider =
+    FutureProvider.family<List<PlaceSummary>, String>(
+  (ref, query) async {
+    if (query.trim().length < 2) return [];
+    final api = ref.watch(apiClientProvider);
+    // Normalize query: lowercase and remove spaces
+    final normalized = query.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+    return api.searchPlacesInDatabase(normalized);
+  },
+);
+
+final reviewedNearbyProvider =
+    FutureProvider.family<List<PlaceSummary>, NearbyQuery>((ref, q) async {
+  final api = ref.watch(apiClientProvider);
+  return api.reviewedNearby(
+    latitude: q.lat,
+    longitude: q.lon,
+    radiusM: q.radiusM,
+  );
+});

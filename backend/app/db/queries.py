@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -135,6 +135,79 @@ async def upsert_place(
     )
     result = await session.execute(stmt)
     return result.scalar_one()
+
+
+async def find_reviewed_places(
+    session: AsyncSession,
+    *,
+    lat: float,
+    lon: float,
+    radius_m: float,
+    limit: int = 200,
+) -> list[Place]:
+    """Return places with reviews (any visibility status) within radius_m.
+
+    Sorted by distance, filtered to only places that have contributions.
+    Includes PUBLIC, CAVEAT, and HIDDEN contributions.
+    """
+    distance_expr = text(
+        "ST_Distance(location::geography, "
+        "ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography)"
+    )
+    within_expr = text(
+        "ST_DWithin(location::geography, "
+        "ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :radius_m)"
+    )
+
+    stmt = (
+        select(Place)
+        .where(within_expr)
+        .where(Place.contribution_count > 0)  # Any contribution, not just public
+        .order_by(distance_expr.asc())
+        .limit(limit)
+        .params(lat=lat, lon=lon, radius_m=radius_m)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def search_places_by_name(
+    session: AsyncSession,
+    *,
+    query: str,
+    limit: int = 20,
+) -> list[Place]:
+    """Search places by name using fuzzy matching (ILIKE).
+
+    Normalizes query: lowercase and removes spaces for better matching.
+    Returns places that match the query string, sorted by exact match first,
+    then by aggregate trust (most trusted first).
+    Also includes places with no reviews yet.
+    """
+    # Normalize query: lowercase and remove spaces
+    normalized_query = query.lower().replace(" ", "")
+    safe_query = normalized_query.replace("%", r"\%").replace("_", r"\_")
+
+    # Create normalized name column for comparison
+    normalized_name = func.replace(func.lower(Place.name), " ", "")
+
+    stmt = (
+        select(Place)
+        .where(normalized_name.ilike(f"%{safe_query}%"))
+        .order_by(
+            # Exact match first
+            normalized_name == normalized_query,
+            # Then exact match on original name
+            func.lower(Place.name) == query.lower(),
+            # Then by has data (places with reviews first)
+            Place.public_count > 0,
+            # Then by aggregate trust (descending)
+            Place.aggregate_trust.desc(),
+        )
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
 
 
 async def recompute_place_aggregates(

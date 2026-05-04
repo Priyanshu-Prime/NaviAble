@@ -2,9 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../models/place_models.dart';
 import '../providers/location_provider.dart';
@@ -21,37 +22,56 @@ class MapScreen extends ConsumerStatefulWidget {
 }
 
 class _MapScreenState extends ConsumerState<MapScreen> {
-  GoogleMapController? _map;
-  CameraPosition? _camera;
+  late MapController _mapController;
+  LatLng? _currentCenter;
   Timer? _debounce;
   NearbyQuery? _activeQuery;
   bool _onlyVerified = false;
+  bool _onlyReviewed = false;
+  bool _showSearchBar = true;
   String? _selectedGid;
+  double _currentZoom = 12;
 
-  void _onCameraIdle() {
-    if (_camera == null) return;
+  @override
+  void initState() {
+    super.initState();
+    _mapController = MapController();
+  }
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onMapMoved() {
+    if (_mapController.camera.center == null) return;
+    _currentCenter = _mapController.camera.center;
+    _currentZoom = _mapController.camera.zoom;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), () {
+      final center = _mapController.camera.center;
+      final zoom = _mapController.camera.zoom;
       final q = NearbyQuery(
-        lat: _camera!.target.latitude,
-        lon: _camera!.target.longitude,
-        radiusM: _radiusFromZoom(_camera!.zoom),
+        lat: center.latitude,
+        lon: center.longitude,
+        radiusM: _radiusFromZoom(zoom),
       );
       setState(() => _activeQuery = q);
     });
   }
 
   int _radiusFromZoom(double zoom) {
-    // Approximate "half the visible diagonal in metres". Capped at backend max.
     final base = 40000 / math.pow(2, zoom - 11);
     return base.clamp(100, 10000).toInt();
   }
 
-  BitmapDescriptor _markerHueFor(PlaceSummary p) {
-    if (!p.hasData) return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
-    if (p.aggregateTrust >= 0.70) return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
-    if (p.aggregateTrust >= 0.40) return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
-    return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+  Color _markerColorFor(PlaceSummary p) {
+    if (!p.hasData) return Colors.blue;
+    if (p.aggregateTrust >= 0.70) return Colors.green;
+    if (p.aggregateTrust >= 0.40) return Colors.orange;
+    return Colors.red;
   }
 
   @override
@@ -59,7 +79,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final locAsync = ref.watch(currentLocationProvider);
     final placesAsync = _activeQuery == null
         ? const AsyncValue<List<PlaceSummary>>.data([])
-        : ref.watch(nearbyPlacesProvider(_activeQuery!));
+        : _onlyReviewed
+            ? ref.watch(reviewedNearbyProvider(_activeQuery!))
+            : ref.watch(nearbyPlacesProvider(_activeQuery!));
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -67,11 +89,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _ErrorOverlay(message: 'Location error: $e'),
         data: (loc) {
-          final initialCamera = CameraPosition(
-            target: LatLng(loc.latitude, loc.longitude),
-            zoom: 15,
-          );
-
           final placesRaw = placesAsync.maybeWhen(
             data: (l) => l,
             orElse: () => const <PlaceSummary>[],
@@ -82,12 +99,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
           final markers = filtered
               .map((p) => Marker(
-                    markerId: MarkerId(p.googlePlaceId),
-                    position: LatLng(p.latitude, p.longitude),
-                    icon: _markerHueFor(p),
-                    onTap: () => setState(() => _selectedGid = p.googlePlaceId),
+                    point: LatLng(p.latitude, p.longitude),
+                    width: 40,
+                    height: 40,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedGid = p.googlePlaceId),
+                      child: Icon(
+                        Icons.location_on,
+                        color: _markerColorFor(p),
+                        size: 40,
+                      ),
+                    ),
                   ))
-              .toSet();
+              .toList();
 
           final selected = filtered
               .where((p) => p.googlePlaceId == _selectedGid)
@@ -96,64 +120,108 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
           return Stack(
             children: [
-              GoogleMap(
-                initialCameraPosition: initialCamera,
-                myLocationEnabled: true,
-                myLocationButtonEnabled: false,
-                markers: markers,
-                onMapCreated: (c) {
-                  _map = c;
-                  _camera = initialCamera;
-                  _onCameraIdle();
-                },
-                onCameraMove: (cp) => _camera = cp,
-                onCameraIdle: _onCameraIdle,
-                onTap: (_) => setState(() => _selectedGid = null),
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: LatLng(loc.latitude, loc.longitude),
+                  initialZoom: 12,
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'ai.naviable',
+                  ),
+                  MarkerLayer(markers: markers),
+                ],
               ),
 
-              // Search bar
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                  child: PlaceSearchBar(
-                    onPick: (gid) => context.push('/place/$gid'),
+              // Search bar (collapsible)
+              if (_showSearchBar)
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                    child: Stack(
+                      children: [
+                        PlaceSearchBar(
+                          onPick: (gid) => context.push('/place/$gid'),
+                        ),
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.grey.shade800,
+                            child: IconButton(
+                              icon: const Icon(Icons.close, size: 18, color: Colors.white),
+                              onPressed: () => setState(() => _showSearchBar = false),
+                              padding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                // Search toggle button
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                    child: FloatingActionButton.small(
+                      heroTag: 'search_toggle',
+                      backgroundColor: NaviAbleColors.primary,
+                      onPressed: () => setState(() => _showSearchBar = true),
+                      child: const Icon(Icons.search),
+                    ),
                   ),
                 ),
-              ),
 
-              // Filter chip
+              // Filter chips
               Positioned(
-                top: 80, left: 12,
+                top: 80,
+                left: 12,
                 child: SafeArea(
-                  child: FilterChip(
-                    label: Text(_onlyVerified ? 'Verified only' : 'All places'),
-                    avatar: Icon(_onlyVerified ? Icons.verified : Icons.public, size: 18),
-                    selected: _onlyVerified,
-                    onSelected: (v) => setState(() => _onlyVerified = v),
+                  child: Row(
+                    children: [
+                      FilterChip(
+                        label: Text(_onlyVerified ? 'Verified only' : 'All places'),
+                        avatar: Icon(_onlyVerified ? Icons.verified : Icons.public, size: 18),
+                        selected: _onlyVerified,
+                        onSelected: (v) => setState(() => _onlyVerified = v),
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        label: Text(_onlyReviewed ? 'Reviewed (${_activeQuery?.radiusM ?? 0}m)' : 'All'),
+                        avatar: Icon(_onlyReviewed ? Icons.rate_review : Icons.map, size: 18),
+                        selected: _onlyReviewed,
+                        onSelected: (v) => setState(() => _onlyReviewed = v),
+                      ),
+                    ],
                   ),
                 ),
               ),
 
-              // Loading shimmer
+              // Loading indicator
               if (placesAsync.isLoading && filtered.isEmpty)
                 const Positioned(
-                  top: 16, right: 16,
+                  top: 16,
+                  right: 16,
                   child: SizedBox(
-                    width: 24, height: 24,
+                    width: 24,
+                    height: 24,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 ),
 
               // Recenter FAB
               Positioned(
-                right: 12, bottom: 96,
+                right: 12,
+                bottom: 96,
                 child: FloatingActionButton.small(
                   heroTag: 'recenter',
                   onPressed: () async {
                     final l = await ref.read(currentLocationProvider.future);
-                    _map?.animateCamera(CameraUpdate.newLatLngZoom(
-                      LatLng(l.latitude, l.longitude), 16,
-                    ));
+                    _mapController.move(LatLng(l.latitude, l.longitude), 14);
                   },
                   child: const Icon(Icons.my_location),
                 ),
@@ -161,7 +229,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
               // Add review FAB
               Positioned(
-                right: 12, bottom: 24,
+                right: 12,
+                bottom: 24,
                 child: FloatingActionButton.extended(
                   heroTag: 'add',
                   backgroundColor: NaviAbleColors.primary,
@@ -176,15 +245,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     }
                   },
                   icon: const Icon(Icons.add_a_photo, color: Colors.white),
-                  label: const Text('Add review',
-                      style: TextStyle(color: Colors.white)),
+                  label: const Text('Add review', style: TextStyle(color: Colors.white)),
                 ),
               ),
 
               // Selected pin sheet
               if (selected != null)
                 Positioned(
-                  left: 0, right: 0, bottom: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
                   child: PlaceBottomSheet(
                     place: selected,
                     onClose: () => setState(() => _selectedGid = null),
@@ -202,6 +272,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 class _ErrorOverlay extends StatelessWidget {
   final String message;
   const _ErrorOverlay({required this.message});
+
   @override
   Widget build(BuildContext context) =>
       Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(message)));
